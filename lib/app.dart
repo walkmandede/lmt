@@ -1,0 +1,48 @@
+import 'package:flutter/material.dart';
+import 'package:lmt/src/views/sites/create/site_create_page.dart';
+import 'package:lmt/src/views/sites/detail/site_detail_page.dart';
+import 'package:lmt/src/views/sites/import/site_import_page.dart';
+import 'package:lmt/src/views/sites/list/site_list_page.dart';
+import 'package:lmt/src/views/sites/update/site_update_page.dart';
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      initialRoute: '/',
+      routes: {
+        '/': (_) => const SiteListPage(),
+        '/create': (_) => const SiteCreatePage(),
+      },
+      theme: ThemeData(
+        useMaterial3: false,
+      ),
+      onGenerateRoute: (settings) {
+        if (settings.name == '/detail') {
+          final id = settings.arguments as String;
+          return MaterialPageRoute(builder: (_) => SiteDetailPage(circuitId: id));
+        }
+
+        if (settings.name == '/update') {
+          final id = settings.arguments as String;
+          return MaterialPageRoute(builder: (_) => SiteUpdatePage(circuitId: id));
+        }
+
+        if (settings.name == '/update') {
+          final id = settings.arguments as String;
+          return MaterialPageRoute(builder: (_) => SiteUpdatePage(circuitId: id));
+        }
+
+        if (settings.name == '/import') {
+          return MaterialPageRoute(builder: (_) => SiteImportPage());
+        }
+        // '/import': (_) => const SiteImportPage(),
+
+        return null;
+      },
+    );
+  }
+}
