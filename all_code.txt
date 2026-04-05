@@ -1,0 +1,3095 @@
+import 'package:flutter/material.dart';
+
+const double kBasePaddingM = 16;
+const double kBasePaddingS = 8;
+const double kBasePaddingL = 32;
+const double kBaseButtonHeight = 54;
+const double kBaseButtonHeightS = 40;
+const double kBaseButtonHeightM = 50;
+const double kStandardMaxWidthForPortraitOrientation = 500;
+const double kBaseBorderRadius = 16;
+const double kBaseBorderRadiusS = 8;
+const double kBaseBorderRadiusL = 24;
+
+//font sizes
+const double kBaseFontSize = 14;
+const double kBaseFontHeadingSize = 24;
+const double kBaseFontTitleSize = 18;
+const double kBaseFontSubtitleSize = 16;
+const double kBaseFontSmallSize = 12;
+
+const BoxShadow boxShadow = BoxShadow();
+class AppAssets {
+  static const String logo = 'assets/images/logo.ico';
+  static const String logoLabel = 'assets/images/logo_label.png';
+  static const String psi1 = 'assets/images/psi1.jpeg';
+  static const String psi2 = 'assets/images/psi2.jpeg';
+  static const String psi3 = 'assets/images/psi3.jpeg';
+  static const String psi4 = 'assets/images/psi4.jpeg';
+  static const String psi5 = 'assets/images/psi5.jpeg';
+}
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+void superPrint(var content, {var title = 'Super Print'}) {
+  String callerFrame = '';
+
+  if (kDebugMode) {
+    try {
+      final stackTrace = StackTrace.current;
+      final frames = stackTrace.toString().split("\n");
+      callerFrame = frames[1];
+    } catch (e1) {
+      debugPrint(e1.toString(), wrapWidth: 1024);
+    }
+
+    DateTime dateTime = DateTime.now();
+    String dateTimeString = '${dateTime.hour} : ${dateTime.minute} : ${dateTime.second}.${dateTime.millisecond}';
+    debugPrint('', wrapWidth: 1024);
+    debugPrint('- ${title.toString()} - ${callerFrame.split('(').last.replaceAll(')', '')}', wrapWidth: 1024);
+    debugPrint('____________________________');
+    try {
+      debugPrint(const JsonEncoder.withIndent('  ').convert(const JsonDecoder().convert(content)), wrapWidth: 1024);
+    } catch (e1) {
+      try {
+        debugPrint(const JsonEncoder.withIndent('  ').convert(const JsonDecoder().convert(jsonEncode(content))), wrapWidth: 1024);
+      } catch (e1) {
+        debugPrint(content.toString());
+        // saveLogFromException(e1,e2);;
+      }
+      // saveLogFromException(e1,e2);;
+    }
+    debugPrint('____________________________ $dateTimeString');
+  }
+}
+
+void dismissKeyboard() {
+  FocusManager.instance.primaryFocus?.unfocus();
+}
+
+void vibrateNow() {
+  try {
+    HapticFeedback.selectionClick();
+  } catch (_) {}
+}
+
+class AppFunctions {}
+class AppSvgs {
+  static const google =
+      """<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <path d="M30.0014 16.3109C30.0014 15.1598 29.9061 14.3198 29.6998 13.4487H16.2871V18.6442H24.1601C24.0014 19.9354 23.1442 21.8798 21.2394 23.1864L21.2127 23.3604L25.4536 26.58L25.7474 26.6087C28.4458 24.1665 30.0014 20.5731 30.0014 16.3109Z" fill="#4285F4"></path> <path d="M16.2863 29.9998C20.1434 29.9998 23.3814 28.7553 25.7466 26.6086L21.2386 23.1863C20.0323 24.0108 18.4132 24.5863 16.2863 24.5863C12.5086 24.5863 9.30225 22.1441 8.15929 18.7686L7.99176 18.7825L3.58208 22.127L3.52441 22.2841C5.87359 26.8574 10.699 29.9998 16.2863 29.9998Z" fill="#34A853"></path> <path d="M8.15964 18.769C7.85806 17.8979 7.68352 16.9645 7.68352 16.0001C7.68352 15.0356 7.85806 14.1023 8.14377 13.2312L8.13578 13.0456L3.67083 9.64746L3.52475 9.71556C2.55654 11.6134 2.00098 13.7445 2.00098 16.0001C2.00098 18.2556 2.55654 20.3867 3.52475 22.2845L8.15964 18.769Z" fill="#FBBC05"></path> <path d="M16.2864 7.4133C18.9689 7.4133 20.7784 8.54885 21.8102 9.4978L25.8419 5.64C23.3658 3.38445 20.1435 2 16.2864 2C10.699 2 5.8736 5.1422 3.52441 9.71549L8.14345 13.2311C9.30229 9.85555 12.5086 7.4133 16.2864 7.4133Z" fill="#EB4335"></path> </g></svg>""";
+
+  static const linkedIn =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-brand-linkedin"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M8 11v5" /><path d="M8 8v.01" /><path d="M12 16v-5" /><path d="M16 16v-3a2 2 0 1 0 -4 0" /><path d="M3 7a4 4 0 0 1 4 -4h10a4 4 0 0 1 4 4v10a4 4 0 0 1 -4 4h-10a4 4 0 0 1 -4 -4l0 -10" /></svg>''';
+
+  static const home =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" class="icon icon-tabler icons-tabler-filled icon-tabler-home-2"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M12.707 2.293l9 9c.63 .63 .184 1.707 -.707 1.707h-1v6a3 3 0 0 1 -3 3h-10a3 3 0 0 1 -3 -3v-6h-1c-.89 0 -1.337 -1.077 -.707 -1.707l9 -9a1 1 0 0 1 1.414 0m.793 8.707h-3a1.5 1.5 0 0 0 -1.5 1.5v3a1.5 1.5 0 0 0 1.5 1.5h3a1.5 1.5 0 0 0 1.5 -1.5v-3a1.5 1.5 0 0 0 -1.5 -1.5" /></svg>''';
+  static const contact =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-address-book"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M20 6v12a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2" /><path d="M10 16h6" /><path d="M11 11a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M4 8h3" /><path d="M4 12h3" /><path d="M4 16h3" /></svg>''';
+  static const scan =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-line-scan"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M4 8v-2a2 2 0 0 1 2 -2h2" /><path d="M4 16v2a2 2 0 0 0 2 2h2" /><path d="M16 4h2a2 2 0 0 1 2 2v2" /><path d="M16 20h2a2 2 0 0 0 2 -2v-2" /><path d="M7 12h10" /></svg>''';
+  static const events =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" class="icon icon-tabler icons-tabler-filled icon-tabler-calendar-event"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M16 2a1 1 0 0 1 .993 .883l.007 .117v1h1a3 3 0 0 1 2.995 2.824l.005 .176v12a3 3 0 0 1 -2.824 2.995l-.176 .005h-12a3 3 0 0 1 -2.995 -2.824l-.005 -.176v-12a3 3 0 0 1 2.824 -2.995l.176 -.005h1v-1a1 1 0 0 1 1.993 -.117l.007 .117v1h6v-1a1 1 0 0 1 1 -1m3 8h-14v8.625c0 .705 .386 1.286 .883 1.366l.117 .009h12c.513 0 .936 -.53 .993 -1.215l.007 -.16zm-9 4a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1v-2a1 1 0 0 1 1 -1z" /></svg>''';
+  static const menu =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-menu"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M4 8l16 0" /><path d="M4 16l16 0" /></svg>''';
+  static const play =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-player-play"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M7 4v16l13 -8l-13 -8" /></svg>''';
+  static const noti =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-bell"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6" /><path d="M9 17v1a3 3 0 0 0 6 0v-1" /></svg>''';
+  static const checkIn =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-login-2"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M9 8v-2a2 2 0 0 1 2 -2h7a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-7a2 2 0 0 1 -2 -2v-2" /><path d="M3 12h13l-3 -3" /><path d="M13 15l3 -3" /></svg>''';
+  static const company =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-building-skyscraper"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 21l18 0" /><path d="M5 21v-14l8 -4v18" /><path d="M19 21v-10l-6 -4" /><path d="M9 9l0 .01" /><path d="M9 12l0 .01" /><path d="M9 15l0 .01" /><path d="M9 18l0 .01" /></svg>''';
+  static const jobPosition =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-briefcase-2"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 9a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-9" /><path d="M8 7v-2a2 2 0 0 1 2 -2h4a2 2 0 0 1 2 2v2" /></svg>''';
+
+  //contact status
+  static const newContact =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-user"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" /><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" /></svg>''';
+  static const connected =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-user-check"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" /><path d="M6 21v-2a4 4 0 0 1 4 -4h4" /><path d="M15 19l2 2l4 -4" /></svg>''';
+  static const qualified =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-user-circle"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M9 10a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M6.168 18.849a4 4 0 0 1 3.832 -2.849h4a4 4 0 0 1 3.834 2.855" /></svg>''';
+  static const proposal =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-user-plus"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" /><path d="M16 19h6" /><path d="M19 16v6" /><path d="M6 21v-2a4 4 0 0 1 4 -4h4" /></svg>''';
+  static const negotiating =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-user-exclamation"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" /><path d="M6 21v-2a4 4 0 0 1 4 -4h4c.348 0 .686 .045 1.008 .128" /><path d="M19 16v3" /><path d="M19 22v.01" /></svg>''';
+  static const lost =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-user-minus"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" /><path d="M6 21v-2a4 4 0 0 1 4 -4h4c.348 0 .686 .045 1.009 .128" /><path d="M16 19h6" /></svg>''';
+  static const closed =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-user-x"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" /><path d="M6 21v-2a4 4 0 0 1 4 -4h3.5" /><path d="M22 22l-5 -5" /><path d="M17 22l5 -5" /></svg>''';
+
+  //contact tag
+  static const lead =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-chalkboard-teacher"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M8 19h-3a2 2 0 0 1 -2 -2v-10a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v11a1 1 0 0 1 -1 1" /><path d="M12 14a2 2 0 1 0 4.001 -.001a2 2 0 0 0 -4.001 .001" /><path d="M17 19a2 2 0 0 0 -2 -2h-2a2 2 0 0 0 -2 2" /></svg>''';
+  static const prospect =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-presentation"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 4l18 0" /><path d="M4 4v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-10" /><path d="M12 16l0 4" /><path d="M9 20l6 0" /><path d="M8 12l3 -3l2 2l3 -3" /></svg>''';
+  static const customer =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-users-group"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M10 13a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" /><path d="M8 21v-1a2 2 0 0 1 2 -2h4a2 2 0 0 1 2 2v1" /><path d="M15 5a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" /><path d="M17 10h2a2 2 0 0 1 2 2v1" /><path d="M5 5a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" /><path d="M3 13v-1a2 2 0 0 1 2 -2h2" /></svg>''';
+  static const partner =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-heart-handshake"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M19.5 12.572l-7.5 7.428l-7.5 -7.428a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572" /><path d="M12 6l-3.293 3.293a1 1 0 0 0 0 1.414l.543 .543c.69 .69 1.81 .69 2.5 0l1 -1a3.182 3.182 0 0 1 4.5 0l2.25 2.25" /><path d="M12.5 15.5l2 2" /><path d="M15 13l2 2" /></svg>''';
+  static const vendor =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-building-store"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 21l18 0" /><path d="M3 7v1a3 3 0 0 0 6 0v-1m0 1a3 3 0 0 0 6 0v-1m0 1a3 3 0 0 0 6 0v-1h-18l2 -4h14l2 4" /><path d="M5 21l0 -10.15" /><path d="M19 21l0 -10.15" /><path d="M9 21v-4a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v4" /></svg>''';
+  static const other =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-dots"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M4 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M18 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /></svg>''';
+
+  static const line =
+      '''<svg fill="#000000" viewBox="-5.5 0 32 32" version="1.1" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <title>line</title> <path d="M10.656 5.938c5.938 0 10.719 3.875 10.719 8.688 0 2.344-1.156 4.406-2.969 6.031-2.938 2.906-8 5.844-8.531 5.625-0.875-0.344 0.656-2.219 0.031-3.031-0.094-0.125-0.438-0.094-1.063-0.188-5.156-0.688-8.844-4.094-8.844-8.469 0-4.813 4.75-8.656 10.656-8.656zM4.563 17.5h1.813c0.313 0 0.5-0.25 0.5-0.563 0-0.219-0.156-0.5-0.563-0.5h-1.469c-0.125 0-0.125-0.125-0.125-0.563v-3.156c0-0.281-0.188-0.563-0.531-0.563-0.313 0-0.531 0.25-0.531 0.563v3.813c0 0.844 0.406 0.969 0.906 0.969zM8.656 17.063v-4.344c0-0.281-0.219-0.563-0.563-0.563-0.281 0-0.531 0.25-0.531 0.563v4.344c0 0.281 0.219 0.5 0.563 0.5 0.281 0 0.531-0.219 0.531-0.5zM13.781 16.469v-3.813c0-0.281-0.219-0.5-0.563-0.5-0.25 0-0.531 0.156-0.531 0.5v2.75l-1.813-2.531c-0.25-0.438-0.563-0.719-0.938-0.719-0.469 0-0.5 0.375-0.5 0.906v4c0 0.281 0.219 0.5 0.531 0.5 0.281 0 0.531-0.188 0.531-0.5v-2.844l1.813 2.531c0.406 0.531 0.5 0.813 1 0.813 0.344 0 0.469-0.313 0.469-1.094zM17.281 14.313h-1.594v-0.906c0-0.094 0.031-0.219 0.188-0.219h1.406c0.344 0 0.563-0.188 0.563-0.531 0-0.406-0.313-0.531-0.594-0.531h-1.813c-0.563 0-0.844 0.375-0.844 0.875v3.531c0 0.625 0.25 0.969 0.844 0.969h1.844c0.406 0 0.563-0.25 0.563-0.563 0-0.406-0.313-0.531-0.563-0.531h-1.375c-0.125 0-0.219-0.094-0.219-0.188v-0.875h1.656c0.406 0 0.469-0.313 0.469-0.531 0-0.313-0.25-0.5-0.531-0.5z"></path> </g></svg>''';
+  static const whatsapp =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-brand-whatsapp"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 21l1.65 -3.8a9 9 0 1 1 3.4 2.9l-5.05 .9" /><path d="M9 10a.5 .5 0 0 0 1 0v-1a.5 .5 0 0 0 -1 0v1a5 5 0 0 0 5 5h1a.5 .5 0 0 0 0 -1h-1a.5 .5 0 0 0 0 1" /></svg>''';
+  static const email =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-mail"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-10" /><path d="M3 7l9 6l9 -6" /></svg>''';
+  static const website =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-app-window"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-10" /><path d="M6 8h.01" /><path d="M9 8h.01" /></svg>''';
+  static const phone =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-phone"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M5 4h4l2 5l-2.5 1.5a11 11 0 0 0 5 5l1.5 -2.5l5 2v4a2 2 0 0 1 -2 2a16 16 0 0 1 -15 -15a2 2 0 0 1 2 -2" /></svg>''';
+  static const duplicates =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-copy"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M7 9.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667l0 -8.666" /><path d="M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1" /></svg>''';
+
+  static const personGroup =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-users"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M5 7a4 4 0 1 0 8 0a4 4 0 1 0 -8 0" /><path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /><path d="M21 21v-2a4 4 0 0 0 -3 -3.85" /></svg>''';
+
+  // menu items
+  static const integrations =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-plug-connected"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M7 12l5 5l-1.5 1.5a3.536 3.536 0 1 1 -5 -5l1.5 -1.5" /><path d="M17 12l-5 -5l1.5 -1.5a3.536 3.536 0 1 1 5 5l-1.5 1.5" /><path d="M3 21l2.5 -2.5" /><path d="M18.5 5.5l2.5 -2.5" /><path d="M10 11l-2 2" /><path d="M13 14l-2 2" /></svg>''';
+  static const pricing =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-diamond"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M6 5h12l3 5l-8.5 9.5a.7 .7 0 0 1 -1 0l-8.5 -9.5l3 -5" /><path d="M10 12l-2 -2.2l.6 -1" /></svg>''';
+  static const closeIcon =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-xbox-x"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M12 21a9 9 0 0 0 9 -9a9 9 0 0 0 -9 -9a9 9 0 0 0 -9 9a9 9 0 0 0 9 9" /><path d="M9 8l6 8" /><path d="M15 8l-6 8" /></svg>''';
+
+  static const chevronLeft =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-chevron-left"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M15 6l-6 6l6 6" /></svg>''';
+  static const checkMark =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-check"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M5 12l5 5l10 -10" /></svg>''';
+  static const xMark =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-x"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></svg>''';
+
+  // pricing plan icons — fill with actual SVGs
+  static const pricingConnector =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-connection"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M15 6.5a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0 -5 0" /><path d="M4 17.5a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0 -5 0" /><path d="M8.5 15.5l7 -7" /></svg>''';
+  static const pricingNetworker =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-affiliate"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M5.931 6.936l1.275 4.249m5.607 5.609l4.251 1.275" /><path d="M11.683 12.317l5.759 -5.759" /><path d="M4 5.5a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0 -3 0" /><path d="M17 5.5a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0 -3 0" /><path d="M17 18.5a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0 -3 0" /><path d="M4 15.5a4.5 4.5 0 1 0 9 0a4.5 4.5 0 1 0 -9 0" /></svg>''';
+  static const pricingCloser =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-bolt"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M13 3l0 7l6 0l-8 11l0 -7l-6 0l8 -11" /></svg>''';
+  static const pricingBusiness =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-briefcase-2"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 9a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-9" /><path d="M8 7v-2a2 2 0 0 1 2 -2h4a2 2 0 0 1 2 2v2" /></svg>''';
+  static const pricingNfcTag =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-nfc"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M11 20a3 3 0 0 1 -3 -3v-11l5 5" /><path d="M13 4a3 3 0 0 1 3 3v11l-5 -5" /><path d="M4 7a3 3 0 0 1 3 -3h10a3 3 0 0 1 3 3v10a3 3 0 0 1 -3 3h-10a3 3 0 0 1 -3 -3l0 -10" /></svg>''';
+
+  // menu items — teams & analytics
+  static const teams =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M10 13a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" /><path d="M8 21v-1a2 2 0 0 1 2 -2h4a2 2 0 0 1 2 2v1" /><path d="M15 5a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" /><path d="M17 10h2a2 2 0 0 1 2 2v1" /><path d="M5 5a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" /><path d="M3 13v-1a2 2 0 0 1 2 -2h2" /></svg>''';
+  static const analytics =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 12m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" /><path d="M9 8m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" /><path d="M15 4m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" /><path d="M4 20l14 0" /></svg>''';
+  static const chevronRight =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M9 6l6 6l-6 6" /></svg>''';
+  static const logout =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M14 8v-2a2 2 0 0 0 -2 -2h-7a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h7a2 2 0 0 0 2 -2v-2" /><path d="M9 12h12l-3 -3" /><path d="M18 15l3 -3" /></svg>''';
+  static const settings =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.066 2.573c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.573 1.066c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.066 -2.573c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" /><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" /></svg>''';
+
+  static const chevronDown =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-circle-chevron-down"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M15 11l-3 3l-3 -3" /><path d="M12 3a9 9 0 1 0 0 18a9 9 0 0 0 0 -18" /></svg>''';
+
+  // menu — account section
+  static const myCard =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 7a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v10a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3v-10" /><path d="M9 10a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" /><path d="M15 8h2" /><path d="M15 12h2" /><path d="M7 16h10" /></svg>''';
+  static const support =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 20l1.3 -3.9c-2.324 -3.437 -1.426 -7.872 2.1 -10.374c3.526 -2.501 8.59 -2.296 11.845 .48c3.255 2.777 3.695 7.266 1.029 10.501c-2.666 3.235 -7.615 4.215 -11.574 2.293l-4.7 1" /></svg>''';
+
+  static const sun =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-sun"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0" /><path d="M3 12h1m8 -9v1m8 8h1m-9 8v1m-6.4 -15.4l.7 .7m12.1 -.7l-.7 .7m0 11.4l.7 .7m-12.1 -.7l-.7 .7" /></svg>''';
+
+  static const moon =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-moon"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" /></svg>''';
+
+  static const deviceDesktop =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-device-mobile"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M6 5a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2v-14z" /><path d="M11 4h2" /><path d="M12 17v.01" /></svg>''';
+
+  static const language =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-language"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M4 5h7" /><path d="M9 3v2c0 4.418 -2.239 8 -5 8" /><path d="M5 9c0 2.144 2.952 3.908 6.7 4" /><path d="M12 20l4 -9l4 9" /><path d="M19.1 18h-6.2" /></svg>''';
+
+  static const theme =
+      '''<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-palette"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M12 21a9 9 0 0 1 0 -18c4.97 0 9 3.582 9 8c0 1.06 -.474 2.078 -1.318 2.828c-.844 .75 -1.989 1.172 -3.182 1.172h-2.5a2 2 0 0 0 -1 3.75a1.3 1.3 0 0 1 -1 2.25" /><path d="M8.5 10.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M12.5 7.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M16.5 10.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /></svg>''';
+
+  static const dummy = '''____''';
+}
+import 'package:lmt/core/services/site_service.dart';
+import 'package:lmt/src/models/site_detail_model.dart';
+
+class SiteRepository {
+  final SupabaseSiteService service;
+
+  SiteRepository(this.service);
+
+  Future<void> saveSite(SiteDetailModel model) async {
+    await service.upsertSite(model);
+
+    if (model.poles != null) {
+      await service.savePoles(model.circuitId, model.poles!);
+    }
+
+    if (model.gallery != null) {
+      model.gallery!.circuitId = model.circuitId;
+      await service.saveGallery(model.gallery!);
+    }
+  }
+}
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+class SupabaseClientProvider {
+  static SupabaseClient get client => Supabase.instance.client;
+}
+import 'package:lmt/src/models/site_detail_model.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+class SupabaseSiteService {
+  final client = Supabase.instance.client;
+
+  // ─── SITE ────────────────────────────────────────────────────────────────
+
+  Future<void> upsertSite(SiteDetailModel site) async {
+    await client.from('site_details').upsert(site.toJson());
+  }
+
+  Future<SiteDetailModel?> getSite(String circuitId) async {
+    final data = await client.from('site_details').select().eq('circuit_id', circuitId).maybeSingle();
+
+    if (data == null) return null;
+
+    final model = SiteDetailModel.fromJson(data);
+    model.poles = await getPoles(circuitId);
+    model.gallery = await getGallery(circuitId);
+    return model;
+  }
+
+  Future<List<Map<String, dynamic>>> listSites({
+    int page = 0,
+    int limit = 20,
+  }) async {
+    final from = page * limit;
+    final to = from + limit - 1;
+    return List<Map<String, dynamic>>.from(
+      await client
+          .from('site_details')
+          .select('circuit_id, customer_name, lsp_name, created_at, survey_result')
+          .range(from, to)
+          .order('created_at', ascending: false),
+    );
+  }
+
+  Future<void> deleteSite(String circuitId) async {
+    await client.from('site_poles').delete().eq('circuit_id', circuitId);
+    await client.from('site_gallery').delete().eq('circuit_id', circuitId);
+    await client.from('site_details').delete().eq('circuit_id', circuitId);
+  }
+
+  // ─── POLES ───────────────────────────────────────────────────────────────
+
+  Future<void> savePoles(String circuitId, List<SitePoleModel> poles) async {
+    // Delete existing then re-insert so order is preserved
+    await client.from('site_poles').delete().eq('circuit_id', circuitId);
+
+    if (poles.isEmpty) return;
+
+    final rows = poles.map((p) {
+      final j = p.toJson();
+      j['circuit_id'] = circuitId;
+      j.remove('id'); // let Supabase generate id on insert
+      return j;
+    }).toList();
+
+    await client.from('site_poles').insert(rows);
+  }
+
+  Future<List<SitePoleModel>> getPoles(String circuitId) async {
+    final data = await client.from('site_poles').select().eq('circuit_id', circuitId).order('created_at');
+    return (data as List).map((e) => SitePoleModel.fromJson(e)).toList();
+  }
+
+  // ─── GALLERY ─────────────────────────────────────────────────────────────
+
+  Future<void> saveGallery(SiteGalleryModel gallery) async {
+    await client.from('site_gallery').upsert(gallery.toJson());
+  }
+
+  Future<SiteGalleryModel?> getGallery(String circuitId) async {
+    final data = await client.from('site_gallery').select().eq('circuit_id', circuitId).maybeSingle();
+    if (data == null) return null;
+    return SiteGalleryModel.fromJson(data);
+  }
+}
+import 'dart:math';
+import 'dart:typed_data';
+import 'package:lmt/core/constants/app_functions.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+class StorageService {
+  final storage = Supabase.instance.client.storage;
+
+  Future<String> uploadImage({
+    required String circuitId,
+    required Uint8List bytes,
+    String folder = 'misc',
+  }) async {
+    final ts = DateTime.now().millisecondsSinceEpoch;
+    final r1 = Random().nextInt(10000);
+    final r2 = Random().nextInt(10000);
+    final r3 = Random().nextInt(10000);
+
+    final path = '$folder/$circuitId/$ts$r1$r2$r3.jpg';
+    superPrint(path);
+    superPrint(bytes.length);
+    await storage
+        .from('site-images')
+        .uploadBinary(
+          path,
+          bytes,
+          fileOptions: const FileOptions(upsert: true),
+        );
+
+    return storage.from('site-images').getPublicUrl(path);
+  }
+}
+import 'package:flutter/material.dart';
+import 'package:lmt/app.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Supabase.initialize(
+    url: 'https://zbqpdaedcztawcmwxqkh.supabase.co',
+    anonKey:
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicXBkYWVkY3p0YXdjbXd4cWtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMjcwNDAsImV4cCI6MjA5MDcwMzA0MH0.IC0cb1Pwa9upTDHFuF_11bb4gcIyuo5Ed4psArkvyGQ',
+  );
+  runApp(MyApp());
+}
+import 'package:flutter/material.dart';
+import 'package:lmt/src/views/sites/create/site_create_page.dart';
+import 'package:lmt/src/views/sites/detail/site_detail_page.dart';
+import 'package:lmt/src/views/sites/list/site_list_page.dart';
+import 'package:lmt/src/views/sites/update/site_update_page.dart';
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      initialRoute: '/',
+      routes: {
+        '/': (_) => const SiteListPage(),
+        '/create': (_) => const SiteCreatePage(),
+      },
+      theme: ThemeData(
+        useMaterial3: false,
+      ),
+      onGenerateRoute: (settings) {
+        if (settings.name == '/detail') {
+          final id = settings.arguments as String;
+          return MaterialPageRoute(builder: (_) => SiteDetailPage(circuitId: id));
+        }
+
+        if (settings.name == '/update') {
+          final id = settings.arguments as String;
+          return MaterialPageRoute(builder: (_) => SiteUpdatePage(circuitId: id));
+        }
+
+        if (settings.name == '/update') {
+          final id = settings.arguments as String;
+          return MaterialPageRoute(builder: (_) => SiteUpdatePage(circuitId: id));
+        }
+
+        return null;
+      },
+    );
+  }
+}
+enum EnumPoleType { epc, mpt, other }
+
+class SitePoleModel {
+  String? id;
+  String? circuitId;
+  EnumPoleType? enumPoleType;
+  double? lat;
+  double? lng;
+  String? image;
+
+  SitePoleModel({
+    this.id,
+    this.circuitId,
+    this.enumPoleType,
+    this.lat,
+    this.lng,
+    this.image,
+  });
+
+  factory SitePoleModel.fromJson(Map<String, dynamic> json) {
+    return SitePoleModel(
+      id: json['id'],
+      circuitId: json['circuit_id'],
+      enumPoleType: json['pole_type'] != null ? EnumPoleType.values.byName(json['pole_type']) : null,
+      lat: (json['lat'] as num?)?.toDouble(),
+      lng: (json['lng'] as num?)?.toDouble(),
+      image: json['image'],
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    if (id != null) 'id': id,
+    'circuit_id': circuitId,
+    'pole_type': enumPoleType?.name,
+    'lat': lat,
+    'lng': lng,
+    'image': image,
+  };
+}
+
+class SiteGalleryModel {
+  String? circuitId;
+
+  String? anNode;
+
+  // D – FAT photos
+  String? d1_1; // FAT closed
+  String? d1_2; // FAT open
+  String? d2_1; // FAT after install (front)
+  String? d2_2; // FAT after install (side)
+  String? d3_1; // Cable label inside FAT 1
+  String? d3_2; // Cable label inside FAT 2
+  List<String>? d4; // Accessories (tension clamp, hook, buckle)
+
+  // E – Customer site photos
+  String? e1; // Outdoor cable (with FAT visible)
+  String? e2; // Home entrance cable
+  String? e3; // Indoor cable (entrance → ATB)
+  String? e4_1; // Cable coil at customer side
+  String? e4_2; // Cable coil at FAT side
+  String? e5; // ATB
+  String? e6_1; // Other remark photo 1
+  String? e6_2; // Other remark photo 2
+  String? e6_3; // Other remark photo 3
+
+  // F – ONT & test results
+  String? f1; // ONT device photo
+  String? f2; // ONT S/N label photo
+  String? f3; // ONT install environment
+  String? f4_1; // Ping test screenshot 1
+  String? f4_2; // Ping test screenshot 2
+  String? f5; // Speed test screenshot
+  String? f6_1; // Call / IPTV test 1
+  String? f6_2; // Call / IPTV test 2
+
+  SiteGalleryModel({this.circuitId});
+
+  factory SiteGalleryModel.fromJson(Map<String, dynamic> json) {
+    return SiteGalleryModel(circuitId: json['circuit_id'])
+      ..anNode = json['an_node']
+      ..d1_1 = json['d1_1']
+      ..d1_2 = json['d1_2']
+      ..d2_1 = json['d2_1']
+      ..d2_2 = json['d2_2']
+      ..d3_1 = json['d3_1']
+      ..d3_2 = json['d3_2']
+      ..d4 = json['d4'] != null ? List<String>.from(json['d4']) : null
+      ..e1 = json['e1']
+      ..e2 = json['e2']
+      ..e3 = json['e3']
+      ..e4_1 = json['e4_1']
+      ..e4_2 = json['e4_2']
+      ..e5 = json['e5']
+      ..e6_1 = json['e6_1']
+      ..e6_2 = json['e6_2']
+      ..e6_3 = json['e6_3']
+      ..f1 = json['f1']
+      ..f2 = json['f2']
+      ..f3 = json['f3']
+      ..f4_1 = json['f4_1']
+      ..f4_2 = json['f4_2']
+      ..f5 = json['f5']
+      ..f6_1 = json['f6_1']
+      ..f6_2 = json['f6_2'];
+  }
+
+  Map<String, dynamic> toJson() => {
+    'an_node': anNode,
+    'circuit_id': circuitId,
+    'd1_1': d1_1,
+    'd1_2': d1_2,
+    'd2_1': d2_1,
+    'd2_2': d2_2,
+    'd3_1': d3_1,
+    'd3_2': d3_2,
+    'd4': d4,
+    'e1': e1,
+    'e2': e2,
+    'e3': e3,
+    'e4_1': e4_1,
+    'e4_2': e4_2,
+    'e5': e5,
+    'e6_1': e6_1,
+    'e6_2': e6_2,
+    'e6_3': e6_3,
+    'f1': f1,
+    'f2': f2,
+    'f3': f3,
+    'f4_1': f4_1,
+    'f4_2': f4_2,
+    'f5': f5,
+    'f6_1': f6_1,
+    'f6_2': f6_2,
+  };
+}
+
+class SiteDetailModel {
+  // A – Circuit ID Information
+  final String circuitId;
+  double? customerLat;
+  double? customerLng;
+  DateTime? workOrderDateTime;
+  DateTime? activationDateTime;
+
+  // B – Site / FAT Information
+  String? surveyResult;
+  DateTime? surveyResultDateTime;
+  String? fatName;
+  String? fatPortNumber;
+  double? fatLat;
+  double? fatLng;
+  double? opticalLevelFatPort1310nm;
+  double? opticalLevelFatPort1490nm;
+  double? opticalLevelAtbPort1310nm;
+  double? opticalLevelAtbPort1490nm;
+  String? dropCableLengthInMeter;
+  double? cableDrumStart;
+  double? cableDrumEnd;
+  String? rowIssue;
+
+  // Additional
+  String? customerName;
+  String? lspName;
+  String? ontSnNumber;
+  String? splitterNo;
+  String? wifiSsid;
+  String? msan;
+  String? linkId;
+  String? poleRange;
+
+  // G – Pole check-list
+  String? checkArea;
+  String? conclusionAndComments;
+
+  List<String>? updatedBy;
+  DateTime? createdAt;
+  DateTime? updatedAt;
+
+  // Relations (loaded separately)
+  List<SitePoleModel>? poles;
+  SiteGalleryModel? gallery;
+
+  SiteDetailModel({required this.circuitId});
+
+  factory SiteDetailModel.fromJson(Map<String, dynamic> json) {
+    return SiteDetailModel(circuitId: json['circuit_id'])
+      ..customerName = json['customer_name']
+      ..lspName = json['lsp_name']
+      ..surveyResult = json['survey_result']
+      ..surveyResultDateTime = json['survey_result_datetime'] != null ? DateTime.tryParse(json['survey_result_datetime']) : null
+      ..customerLat = (json['customer_lat'] as num?)?.toDouble()
+      ..customerLng = (json['customer_lng'] as num?)?.toDouble()
+      ..workOrderDateTime = json['work_order_datetime'] != null ? DateTime.tryParse(json['work_order_datetime']) : null
+      ..activationDateTime = json['activation_datetime'] != null ? DateTime.tryParse(json['activation_datetime']) : null
+      ..fatName = json['fat_name']
+      ..fatPortNumber = json['fat_port_number']
+      ..fatLat = (json['fat_lat'] as num?)?.toDouble()
+      ..fatLng = (json['fat_lng'] as num?)?.toDouble()
+      ..opticalLevelFatPort1310nm = (json['optical_level_fat_port_1310nm'] as num?)?.toDouble()
+      ..opticalLevelFatPort1490nm = (json['optical_level_fat_port_1490nm'] as num?)?.toDouble()
+      ..opticalLevelAtbPort1310nm = (json['optical_level_atb_port_1310nm'] as num?)?.toDouble()
+      ..opticalLevelAtbPort1490nm = (json['optical_level_atb_port_1490nm'] as num?)?.toDouble()
+      ..dropCableLengthInMeter = json['drop_cable_length']
+      ..cableDrumStart = (json['cable_drum_start'] as num?)?.toDouble()
+      ..cableDrumEnd = (json['cable_drum_end'] as num?)?.toDouble()
+      ..rowIssue = json['row_issue']
+      ..ontSnNumber = json['ont_sn_number']
+      ..splitterNo = json['splitter_no']
+      ..wifiSsid = json['wifi_ssid']
+      ..msan = json['msan']
+      ..linkId = json['link_id']
+      ..poleRange = json['pole_range']
+      ..checkArea = json['check_area']
+      ..conclusionAndComments = json['conclusion']
+      ..updatedBy = json['updated_by'] != null ? List<String>.from(json['updated_by']) : null
+      ..createdAt = json['created_at'] != null ? DateTime.tryParse(json['created_at']) : null
+      ..updatedAt = json['updated_at'] != null ? DateTime.tryParse(json['updated_at']) : null;
+  }
+
+  Map<String, dynamic> toJson() => {
+    'circuit_id': circuitId,
+    'customer_name': customerName,
+    'lsp_name': lspName,
+    'survey_result': surveyResult,
+    'survey_result_datetime': surveyResultDateTime?.toIso8601String(),
+    'customer_lat': customerLat,
+    'customer_lng': customerLng,
+    'work_order_datetime': workOrderDateTime?.toIso8601String(),
+    'activation_datetime': activationDateTime?.toIso8601String(),
+    'fat_name': fatName,
+    'fat_port_number': fatPortNumber,
+    'fat_lat': fatLat,
+    'fat_lng': fatLng,
+    'optical_level_fat_port_1310nm': opticalLevelFatPort1310nm,
+    'optical_level_fat_port_1490nm': opticalLevelFatPort1490nm,
+    'optical_level_atb_port_1310nm': opticalLevelAtbPort1310nm,
+    'optical_level_atb_port_1490nm': opticalLevelAtbPort1490nm,
+    'drop_cable_length': dropCableLengthInMeter,
+    'cable_drum_start': cableDrumStart,
+    'cable_drum_end': cableDrumEnd,
+    'row_issue': rowIssue,
+    'ont_sn_number': ontSnNumber,
+    'splitter_no': splitterNo,
+    'wifi_ssid': wifiSsid,
+    'msan': msan,
+    'link_id': linkId,
+    'pole_range': poleRange,
+    'check_area': checkArea,
+    'conclusion': conclusionAndComments,
+    'updated_by': updatedBy,
+    'updated_at': DateTime.now().toIso8601String(),
+  };
+}
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
+
+class ImageViewerPage extends StatelessWidget {
+  final Uint8List? bytes;
+  final String? imageUrl;
+  final String title;
+
+  const ImageViewerPage({
+    super.key,
+    this.bytes,
+    this.imageUrl,
+    required this.title,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Widget image;
+
+    if (bytes != null) {
+      image = Image.memory(bytes!, fit: BoxFit.contain);
+    } else if (imageUrl != null) {
+      image = Image.network(imageUrl!, fit: BoxFit.contain);
+    } else {
+      image = const SizedBox();
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        title: Text(title),
+      ),
+      body: Center(
+        child: InteractiveViewer(
+          minScale: 0.5,
+          maxScale: 5,
+          child: image,
+        ),
+      ),
+    );
+  }
+}
+
+void openImageViewer({
+  required BuildContext context,
+  Uint8List? bytes,
+  String? url,
+  String title = "Image",
+}) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => ImageViewerPage(
+        bytes: bytes,
+        imageUrl: url,
+        title: title,
+      ),
+    ),
+  );
+}
+import 'package:flutter/material.dart';
+
+class SectionCard extends StatelessWidget {
+  final String title;
+  final Widget child;
+
+  const SectionCard({
+    super.key,
+    required this.title,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 8,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 12),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+}
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:lmt/core/repositories/site_repository.dart';
+import 'package:lmt/core/services/site_service.dart';
+import 'package:lmt/core/services/storage_service.dart';
+import 'package:lmt/src/models/site_detail_model.dart';
+import 'package:lmt/src/views/_widgets/image_viewer_page.dart';
+import 'package:lmt/src/views/_widgets/section_card.dart';
+
+class SiteUpdatePage extends StatefulWidget {
+  final String circuitId;
+  const SiteUpdatePage({super.key, required this.circuitId});
+
+  @override
+  State<SiteUpdatePage> createState() => _SiteUpdatePageState();
+}
+
+class _SiteUpdatePageState extends State<SiteUpdatePage> {
+  final _picker = ImagePicker();
+  final _storage = StorageService();
+  final _service = SupabaseSiteService();
+  late final _repo = SiteRepository(_service);
+
+  bool _loading = true;
+  bool _saving = false;
+
+  SiteDetailModel? _original;
+
+  // ── A ────────────────────────────────────────────────────────────────────
+  final _circuitIdCtrl = TextEditingController();
+  final _customerNameCtrl = TextEditingController();
+  final _lspNameCtrl = TextEditingController();
+  final _customerLatCtrl = TextEditingController();
+  final _customerLngCtrl = TextEditingController();
+  DateTime? _workOrderDate;
+  DateTime? _activationDate;
+
+  // ── B ────────────────────────────────────────────────────────────────────
+  DateTime? _surveyDate;
+  final _fatNameCtrl = TextEditingController();
+  final _fatPortCtrl = TextEditingController();
+  final _fatLatCtrl = TextEditingController();
+  final _fatLngCtrl = TextEditingController();
+  final _optFat1310Ctrl = TextEditingController();
+  final _optFat1490Ctrl = TextEditingController();
+  final _optAtb1310Ctrl = TextEditingController();
+  final _optAtb1490Ctrl = TextEditingController();
+  final _dropCableCtrl = TextEditingController();
+  final _rowIssueCtrl = TextEditingController();
+
+  // ── Additional ───────────────────────────────────────────────────────────
+  final _ontSnCtrl = TextEditingController();
+  final _splitterCtrl = TextEditingController();
+  final _wifiSsidCtrl = TextEditingController();
+  final _msanCtrl = TextEditingController();
+  final _linkIdCtrl = TextEditingController();
+  final _poleRangeCtrl = TextEditingController();
+
+  // ── G ────────────────────────────────────────────────────────────────────
+  final _checkAreaCtrl = TextEditingController();
+  final _conclusionCtrl = TextEditingController();
+
+  // ── Poles ─────────────────────────────────────────────────────────────────
+  final List<_PoleEntry> _poles = [];
+
+  // ── Gallery ──────────────────────────────────────────────────────────────
+  // Existing URLs loaded from DB (shown when no new file picked)
+  final Map<String, String?> _existingUrls = {};
+  // Newly picked local files (override existing on save)
+  final Map<String, XFile?> _newFiles = {};
+
+  final List<XFile> _d4NewImages = []; // newly picked files
+  final List<String> _d4ExistingUrls = [];
+
+  // ── Load ─────────────────────────────────────────────────────────────────
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final model = await _service.getSite(widget.circuitId);
+    if (model == null || !mounted) return;
+
+    _original = model;
+
+    // A
+    _circuitIdCtrl.text = model.circuitId;
+    _customerNameCtrl.text = model.customerName ?? '';
+    _lspNameCtrl.text = model.lspName ?? '';
+    _customerLatCtrl.text = model.customerLat?.toString() ?? '';
+    _customerLngCtrl.text = model.customerLng?.toString() ?? '';
+    _workOrderDate = model.workOrderDateTime;
+    _activationDate = model.activationDateTime;
+
+    // B
+    _surveyDate = model.surveyResultDateTime;
+    _fatNameCtrl.text = model.fatName ?? '';
+    _fatPortCtrl.text = model.fatPortNumber ?? '';
+    _fatLatCtrl.text = model.fatLat?.toString() ?? '';
+    _fatLngCtrl.text = model.fatLng?.toString() ?? '';
+    _optFat1310Ctrl.text = model.opticalLevelFatPort1310nm?.toString() ?? '';
+    _optFat1490Ctrl.text = model.opticalLevelFatPort1490nm?.toString() ?? '';
+    _optAtb1310Ctrl.text = model.opticalLevelAtbPort1310nm?.toString() ?? '';
+    _optAtb1490Ctrl.text = model.opticalLevelAtbPort1490nm?.toString() ?? '';
+    _dropCableCtrl.text = model.dropCableLengthInMeter ?? '';
+    _rowIssueCtrl.text = model.rowIssue ?? '';
+
+    // Additional
+    _ontSnCtrl.text = model.ontSnNumber ?? '';
+    _splitterCtrl.text = model.splitterNo ?? '';
+    _wifiSsidCtrl.text = model.wifiSsid ?? '';
+    _msanCtrl.text = model.msan ?? '';
+    _linkIdCtrl.text = model.linkId ?? '';
+    _poleRangeCtrl.text = model.poleRange ?? '';
+
+    // G
+    _checkAreaCtrl.text = model.checkArea ?? '';
+    _conclusionCtrl.text = model.conclusionAndComments ?? '';
+
+    // Poles
+    for (final p in model.poles ?? []) {
+      _poles.add(_PoleEntry.fromModel(p));
+    }
+
+    // Gallery existing URLs
+    final g = model.gallery;
+    if (g != null) {
+      _existingUrls.addAll({
+        'an_node': g.anNode,
+        'd1_1': g.d1_1,
+        'd1_2': g.d1_2,
+        'd2_1': g.d2_1,
+        'd2_2': g.d2_2,
+        'd3_1': g.d3_1,
+        'd3_2': g.d3_2,
+        'e1': g.e1,
+        'e2': g.e2,
+        'e3': g.e3,
+        'e4_1': g.e4_1,
+        'e4_2': g.e4_2,
+        'e5': g.e5,
+        'e6_1': g.e6_1,
+        'e6_2': g.e6_2,
+        'e6_3': g.e6_3,
+        'f1': g.f1,
+        'f2': g.f2,
+        'f3': g.f3,
+        'f4_1': g.f4_1,
+        'f4_2': g.f4_2,
+        'f5': g.f5,
+        'f6_1': g.f6_1,
+        'f6_2': g.f6_2,
+      });
+    }
+
+    final d4 = model.gallery?.d4;
+    if (d4 != null) {
+      _d4ExistingUrls.addAll(d4);
+    }
+
+    setState(() => _loading = false);
+  }
+
+  // ── Image picker ──────────────────────────────────────────────────────────
+
+  Future<XFile?> _pickImageFromSource() async {
+    final src = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Camera'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Gallery'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (src == null) return null;
+    return _picker.pickImage(source: src, imageQuality: 80);
+  }
+
+  Future<void> _pickGalleryImage(String key) async {
+    final picked = await _pickImageFromSource();
+    if (picked != null) setState(() => _newFiles[key] = picked);
+  }
+
+  Future<void> _pickPoleImage(int index) async {
+    final picked = await _pickImageFromSource();
+    if (picked != null) setState(() => _poles[index].newImage = picked);
+  }
+
+  Future<void> _pickD4Image() async {
+    final picked = await _pickImageFromSource();
+    if (picked != null) setState(() => _d4NewImages.add(picked));
+  }
+  // ── Photo slot ────────────────────────────────────────────────────────────
+
+  /// Shows new local file if picked, falls back to existing URL, else empty slot.
+  Widget _photoSlot({
+    required BuildContext context,
+    required XFile? newFile,
+    required String? existingUrl,
+    required String label,
+    required VoidCallback onTap,
+    required VoidCallback onRemove,
+  }) {
+    final hasNew = newFile != null;
+    final hasExisting = existingUrl != null && existingUrl.isNotEmpty;
+
+    Future<void> handleTap() async {
+      /// EMPTY → PICK IMAGE
+      if (!hasNew && !hasExisting) {
+        onTap();
+        return;
+      }
+
+      /// NEW LOCAL IMAGE → VIEWER
+      if (hasNew) {
+        final bytes = await newFile.readAsBytes();
+        if (context.mounted) {
+          openImageViewer(
+            context: context,
+            bytes: bytes,
+            title: label,
+          );
+        }
+
+        return;
+      }
+
+      /// EXISTING URL → VIEWER
+      if (hasExisting) {
+        openImageViewer(
+          context: context,
+          url: existingUrl,
+          title: label,
+        );
+      }
+    }
+
+    return GestureDetector(
+      onTap: handleTap,
+      child: Container(
+        width: double.infinity,
+        constraints: const BoxConstraints(minHeight: 100, maxHeight: 200),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: hasNew
+                ? Colors.blue.shade300
+                : hasExisting
+                ? Colors.green.shade300
+                : Colors.grey.shade300,
+          ),
+          borderRadius: BorderRadius.circular(8),
+          color: Colors.grey.shade100,
+        ),
+        child: (hasNew || hasExisting)
+            ? Stack(
+                fit: StackFit.expand,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+
+                    /// ✅ FIXED IMAGE DISPLAY
+                    child: hasNew
+                        ? FutureBuilder<Uint8List>(
+                            future: newFile.readAsBytes(),
+                            builder: (context, snap) {
+                              if (!snap.hasData) {
+                                return const Center(
+                                  child: CircularProgressIndicator(),
+                                );
+                              }
+                              return Image.memory(
+                                snap.data!,
+                                fit: BoxFit.contain,
+                              );
+                            },
+                          )
+                        : Image.network(
+                            existingUrl!,
+                            fit: BoxFit.contain,
+                          ),
+                  ),
+
+                  /// BADGE
+                  Positioned(
+                    top: 4,
+                    left: 4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: hasNew ? Colors.blue : Colors.green,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        hasNew ? 'NEW' : 'SAVED',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  /// REMOVE BUTTON
+                  Positioned(
+                    top: 4,
+                    right: 4,
+                    child: GestureDetector(
+                      onTap: onRemove,
+                      child: const CircleAvatar(
+                        radius: 12,
+                        backgroundColor: Colors.red,
+                        child: Icon(Icons.close, size: 14, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.add_a_photo, color: Colors.grey),
+                  const SizedBox(height: 4),
+                  Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+
+  Widget _keyedPhotoSlot(String key, String label) {
+    return _photoSlot(
+      context: context,
+      newFile: _newFiles[key],
+      existingUrl: _existingUrls[key],
+      label: label,
+      onTap: () => _pickGalleryImage(key),
+      onRemove: () => setState(() {
+        _newFiles[key] = null;
+        _existingUrls[key] = null;
+      }),
+    );
+  }
+
+  Widget _twoPhotoRow(String key1, String label1, String key2, String label2) {
+    return Row(
+      children: [
+        Expanded(child: _keyedPhotoSlot(key1, label1)),
+        const SizedBox(width: 8),
+        Expanded(child: _keyedPhotoSlot(key2, label2)),
+      ],
+    );
+  }
+
+  // ── Form helpers ──────────────────────────────────────────────────────────
+
+  Widget _labeledField(
+    TextEditingController ctrl,
+    String label, {
+    TextInputType type = TextInputType.text,
+    String? hint,
+    int maxLines = 1,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextField(
+        controller: ctrl,
+        keyboardType: type,
+        maxLines: maxLines,
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: hint,
+          border: const OutlineInputBorder(),
+          isDense: true,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickDate(BuildContext context, void Function(DateTime) onPicked) async {
+    final d = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+    );
+    if (d == null) return;
+    final t = await showTimePicker(context: context, initialTime: TimeOfDay.now());
+    if (t == null) return;
+    onPicked(DateTime(d.year, d.month, d.day, t.hour, t.minute));
+  }
+
+  Widget _dateTile(String label, DateTime? value, void Function(DateTime) onPicked) {
+    return ListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      title: Text(label),
+      subtitle: Text(
+        value != null ? '${value.year}/${_pad(value.month)}/${_pad(value.day)}  ${_pad(value.hour)}:${_pad(value.minute)}' : 'Tap to set',
+        style: TextStyle(color: value != null ? Colors.black87 : Colors.grey),
+      ),
+      trailing: const Icon(Icons.calendar_today, size: 18),
+      onTap: () => _pickDate(context, onPicked),
+    );
+  }
+
+  String _pad(int n) => n.toString().padLeft(2, '0');
+
+  // ── Save ──────────────────────────────────────────────────────────────────
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+
+    try {
+      final circuitId = widget.circuitId;
+
+      final model = SiteDetailModel(circuitId: circuitId)
+        ..customerName = _customerNameCtrl.text.trim().nullIfEmpty
+        ..lspName = _lspNameCtrl.text.trim().nullIfEmpty
+        ..customerLat = double.tryParse(_customerLatCtrl.text)
+        ..customerLng = double.tryParse(_customerLngCtrl.text)
+        ..workOrderDateTime = _workOrderDate
+        ..activationDateTime = _activationDate
+        ..surveyResultDateTime = _surveyDate
+        ..fatName = _fatNameCtrl.text.trim().nullIfEmpty
+        ..fatPortNumber = _fatPortCtrl.text.trim().nullIfEmpty
+        ..fatLat = double.tryParse(_fatLatCtrl.text)
+        ..fatLng = double.tryParse(_fatLngCtrl.text)
+        ..opticalLevelFatPort1310nm = double.tryParse(_optFat1310Ctrl.text)
+        ..opticalLevelFatPort1490nm = double.tryParse(_optFat1490Ctrl.text)
+        ..opticalLevelAtbPort1310nm = double.tryParse(_optAtb1310Ctrl.text)
+        ..opticalLevelAtbPort1490nm = double.tryParse(_optAtb1490Ctrl.text)
+        ..dropCableLengthInMeter = _dropCableCtrl.text.trim().nullIfEmpty
+        ..rowIssue = _rowIssueCtrl.text.trim().nullIfEmpty
+        ..ontSnNumber = _ontSnCtrl.text.trim().nullIfEmpty
+        ..splitterNo = _splitterCtrl.text.trim().nullIfEmpty
+        ..wifiSsid = _wifiSsidCtrl.text.trim().nullIfEmpty
+        ..msan = _msanCtrl.text.trim().nullIfEmpty
+        ..linkId = _linkIdCtrl.text.trim().nullIfEmpty
+        ..poleRange = _poleRangeCtrl.text.trim().nullIfEmpty
+        ..checkArea = _checkAreaCtrl.text.trim().nullIfEmpty
+        ..conclusionAndComments = _conclusionCtrl.text.trim().nullIfEmpty;
+
+      // Build gallery: upload new files, keep existing URLs, clear removed ones
+      final gallery = SiteGalleryModel(circuitId: circuitId);
+      final allKeys = {
+        'an_node',
+        'd1_1',
+        'd1_2',
+        'd2_1',
+        'd2_2',
+        'd3_1',
+        'd3_2',
+        'e1',
+        'e2',
+        'e3',
+        'e4_1',
+        'e4_2',
+        'e5',
+        'e6_1',
+        'e6_2',
+        'e6_3',
+        'f1',
+        'f2',
+        'f3',
+        'f4_1',
+        'f4_2',
+        'f5',
+        'f6_1',
+        'f6_2',
+      };
+
+      for (final key in allKeys) {
+        final newFile = _newFiles[key];
+        final existingUrl = _existingUrls[key];
+
+        String? finalUrl;
+        if (newFile != null) {
+          finalUrl = await _storage.uploadImage(
+            circuitId: circuitId,
+            bytes: await newFile.readAsBytes(),
+            folder: key,
+          );
+        } else {
+          finalUrl = existingUrl; // keep existing or null if removed
+        }
+
+        _setGalleryUrl(gallery, key, finalUrl);
+      }
+      final d4Urls = List<String>.from(_d4ExistingUrls);
+
+      // Upload new D4 images (offset index past existing ones)
+      for (int i = 0; i < _d4NewImages.length; i++) {
+        final url = await _storage.uploadImage(
+          circuitId: circuitId,
+          bytes: await _d4NewImages[i].readAsBytes(),
+          folder: 'd4_${(d4Urls.length + i + 1).toString().padLeft(3, '0')}',
+        );
+        d4Urls.add(url);
+      }
+      gallery.d4 = d4Urls.isEmpty ? null : d4Urls;
+      model.gallery = gallery;
+
+      // Poles: upload new pole images, keep existing URLs
+      model.poles = await Future.wait(
+        _poles.asMap().entries.map((e) async {
+          final index = e.key;
+          final p = e.value;
+          String? imageUrl;
+
+          if (p.newImage != null) {
+            imageUrl = await _storage.uploadImage(
+              circuitId: circuitId,
+              bytes: await p.newImage!.readAsBytes(),
+              folder: 'pole_${(index + 1).toString().padLeft(3, '0')}',
+            );
+          } else {
+            imageUrl = p.existingImageUrl; // keep existing or null if removed
+          }
+
+          return SitePoleModel(
+            id: p.existingId,
+            circuitId: circuitId,
+            enumPoleType: p.type,
+            lat: double.tryParse(p.latCtrl.text),
+            lng: double.tryParse(p.lngCtrl.text),
+            image: imageUrl,
+          );
+        }),
+      );
+
+      await _repo.saveSite(model);
+
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  void _setGalleryUrl(SiteGalleryModel g, String key, String? url) {
+    switch (key) {
+      case 'an_node':
+        g.anNode = url;
+        break;
+      case 'd1_1':
+        g.d1_1 = url;
+        break;
+      case 'd1_2':
+        g.d1_2 = url;
+        break;
+      case 'd2_1':
+        g.d2_1 = url;
+        break;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(
+            color: Colors.grey,
+          ),
+        ),
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.circuitId, style: const TextStyle(fontSize: 14, fontFamily: 'monospace')),
+        actions: [
+          if (_saving)
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.black,
+                ),
+              ),
+            )
+          else
+            IconButton(
+              onPressed: _save,
+              icon: Icon(Icons.save),
+            ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.only(bottom: 32),
+        children: [
+          _sectionA(),
+          _sectionB(),
+          _sectionC(),
+          _sectionD(),
+          _sectionE(),
+          _sectionF(),
+          _sectionG(),
+        ],
+      ),
+    );
+  }
+
+  // ── A ─────────────────────────────────────────────────────────────────────
+
+  Widget _sectionA() {
+    return SectionCard(
+      title: 'A  Circuit ID Information',
+      child: Column(
+        children: [
+          // Circuit ID is read-only on update
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: TextField(
+              controller: _circuitIdCtrl,
+              readOnly: true,
+              decoration: InputDecoration(
+                labelText: 'Circuit ID',
+                border: const OutlineInputBorder(),
+                isDense: true,
+                filled: true,
+                fillColor: Colors.grey.shade100,
+                suffixIcon: const Icon(Icons.lock, size: 16, color: Colors.grey),
+              ),
+            ),
+          ),
+          _labeledField(_customerNameCtrl, 'Customer Name'),
+          _labeledField(_lspNameCtrl, 'LSP Name'),
+          Row(
+            children: [
+              Expanded(child: _labeledField(_customerLatCtrl, 'Cust. Lat', type: const TextInputType.numberWithOptions(decimal: true, signed: true))),
+              const SizedBox(width: 8),
+              Expanded(child: _labeledField(_customerLngCtrl, 'Cust. Long', type: const TextInputType.numberWithOptions(decimal: true, signed: true))),
+            ],
+          ),
+          _dateTile('Work Order Date/Time', _workOrderDate, (d) => setState(() => _workOrderDate = d)),
+          _dateTile('Activation Date', _activationDate, (d) => setState(() => _activationDate = d)),
+        ],
+      ),
+    );
+  }
+
+  // ── B ─────────────────────────────────────────────────────────────────────
+
+  Widget _sectionB() {
+    return SectionCard(
+      title: 'B  Site / FAT Information',
+      child: Column(
+        children: [
+          _dateTile('Survey Result Date', _surveyDate, (d) => setState(() => _surveyDate = d)),
+          _labeledField(_fatNameCtrl, 'FAT Name', hint: 'e.g. YGN-TKI1302-8'),
+          _labeledField(_fatPortCtrl, 'FAT Port Number', hint: 'e.g. Port-5'),
+          Row(
+            children: [
+              Expanded(child: _labeledField(_fatLatCtrl, 'FAT Lat', type: const TextInputType.numberWithOptions(decimal: true, signed: true))),
+              const SizedBox(width: 8),
+              Expanded(child: _labeledField(_fatLngCtrl, 'FAT Long', type: const TextInputType.numberWithOptions(decimal: true, signed: true))),
+            ],
+          ),
+          const Text('Optical Level at FAT Port', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(child: _labeledField(_optFat1310Ctrl, '1310nm (dBm)', type: const TextInputType.numberWithOptions(decimal: true, signed: true))),
+              const SizedBox(width: 8),
+              Expanded(child: _labeledField(_optFat1490Ctrl, '1490nm (dBm)', type: const TextInputType.numberWithOptions(decimal: true, signed: true))),
+            ],
+          ),
+          const Text('Optical Level at ATB Port', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(child: _labeledField(_optAtb1310Ctrl, '1310nm (dBm)', type: const TextInputType.numberWithOptions(decimal: true, signed: true))),
+              const SizedBox(width: 8),
+              Expanded(child: _labeledField(_optAtb1490Ctrl, '1490nm (dBm)', type: const TextInputType.numberWithOptions(decimal: true, signed: true))),
+            ],
+          ),
+          _labeledField(_dropCableCtrl, 'Drop Cable Length (m)', type: TextInputType.number),
+          _labeledField(_rowIssueCtrl, 'ROW Issue', hint: 'No Issue'),
+        ],
+      ),
+    );
+  }
+
+  // ── C: Poles ──────────────────────────────────────────────────────────────
+
+  Widget _sectionC() {
+    return SectionCard(
+      title: 'C  Cable Route / Poles',
+      child: Column(
+        children: [
+          ..._poles.asMap().entries.map((e) => _poleRow(e.key, e.value)),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () => setState(() => _poles.add(_PoleEntry())),
+            icon: const Icon(Icons.add),
+            label: const Text('Add Pole'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _poleRow(int index, _PoleEntry entry) {
+    final poleLabel = 'P_${(index + 1).toString().padLeft(3, '0')}';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(poleLabel, style: const TextStyle(fontWeight: FontWeight.bold)),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.delete, size: 18, color: Colors.red),
+                onPressed: () => setState(() => _poles.removeAt(index)),
+              ),
+            ],
+          ),
+          DropdownButtonFormField<EnumPoleType>(
+            value: entry.type,
+            decoration: const InputDecoration(
+              labelText: 'Pole Type',
+              isDense: true,
+              border: OutlineInputBorder(),
+            ),
+            items: EnumPoleType.values.map((t) => DropdownMenuItem(value: t, child: Text(t.name.toUpperCase()))).toList(),
+            onChanged: (v) => setState(() => entry.type = v),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: entry.latCtrl,
+                  decoration: const InputDecoration(labelText: 'Latitude', isDense: true, border: OutlineInputBorder()),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: entry.lngCtrl,
+                  decoration: const InputDecoration(labelText: 'Longitude', isDense: true, border: OutlineInputBorder()),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Pole Photo',
+            style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 4),
+          _photoSlot(
+            context: context,
+            newFile: entry.newImage,
+            existingUrl: entry.existingImageUrl,
+            label: 'Tap to add $poleLabel photo',
+            onTap: () => _pickPoleImage(index),
+            onRemove: () => setState(() {
+              _poles[index].newImage = null;
+              _poles[index].existingImageUrl = null;
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── D ─────────────────────────────────────────────────────────────────────
+
+  // 4. Replace _sectionD entirely
+  Widget _sectionD() {
+    return SectionCard(
+      title: 'D  Onsite Installation – FAT',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SubLabel('AN  Node photo'),
+          _keyedPhotoSlot('an_node', 'AN Node'),
+          const SizedBox(height: 12),
+          const _SubLabel('D1  FAT before installation'),
+          _twoPhotoRow('d1_1', 'FAT Closed', 'd1_2', 'FAT Open'),
+          const SizedBox(height: 12),
+          const _SubLabel('D2  FAT after installation'),
+          _twoPhotoRow('d2_1', 'View 1', 'd2_2', 'View 2'),
+          const SizedBox(height: 12),
+          const _SubLabel('D3  Cable label inside FAT'),
+          _twoPhotoRow('d3_1', 'Label 1', 'd3_2', 'Label 2'),
+          const SizedBox(height: 12),
+          const _SubLabel('D4  Accessories (clamp / hook / buckle)'),
+          // Existing D4 URLs (from DB) that haven't been replaced
+          ..._d4ExistingUrls.asMap().entries.map(
+            (e) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _photoSlot(
+                context: context,
+                newFile: null,
+                existingUrl: e.value,
+                label: 'Accessories photo ${e.key + 1}',
+                onTap: () {},
+                onRemove: () => setState(() => _d4ExistingUrls.removeAt(e.key)),
+              ),
+            ),
+          ),
+          // Newly picked D4 images
+          ..._d4NewImages.asMap().entries.map(
+            (e) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _photoSlot(
+                context: context,
+                newFile: e.value,
+                existingUrl: null,
+                label: 'New accessories photo ${e.key + 1}',
+                onTap: () {},
+                onRemove: () => setState(() => _d4NewImages.removeAt(e.key)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          OutlinedButton.icon(
+            onPressed: _pickD4Image,
+            icon: const Icon(Icons.add_a_photo, size: 16),
+            label: const Text('Add D4 Photo'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── E ─────────────────────────────────────────────────────────────────────
+
+  Widget _sectionE() {
+    return SectionCard(
+      title: 'E  Onsite Installation – Customer Site',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SubLabel('E1  Outdoor cable (include FAT in frame)'),
+          _keyedPhotoSlot('e1', 'Outdoor cable route'),
+          const SizedBox(height: 12),
+          const _SubLabel('E2  Customer home entrance cable'),
+          _keyedPhotoSlot('e2', 'Home entrance'),
+          const SizedBox(height: 12),
+          const _SubLabel('E3  Indoor cable (entrance → ATB)'),
+          _keyedPhotoSlot('e3', 'Indoor cable'),
+          const SizedBox(height: 12),
+          const _SubLabel('E4  Cable coils'),
+          _twoPhotoRow('e4_1', 'At customer side', 'e4_2', 'At FAT side'),
+          const SizedBox(height: 12),
+          const _SubLabel('E5  ATB'),
+          _keyedPhotoSlot('e5', 'ATB photo'),
+          const SizedBox(height: 12),
+          const _SubLabel('E6  Other remarks'),
+          Row(
+            children: [
+              Expanded(child: _keyedPhotoSlot('e6_1', 'Photo 1')),
+              const SizedBox(width: 8),
+              Expanded(child: _keyedPhotoSlot('e6_2', 'Photo 2')),
+              const SizedBox(width: 8),
+              Expanded(child: _keyedPhotoSlot('e6_3', 'Photo 3')),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── F ─────────────────────────────────────────────────────────────────────
+
+  Widget _sectionF() {
+    return SectionCard(
+      title: 'F  ONT Test & Service Test',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _labeledField(_ontSnCtrl, 'ONT S/N Number', hint: 'e.g. 4857544307DD03AE'),
+          _labeledField(_splitterCtrl, 'Splitter No'),
+          _labeledField(_wifiSsidCtrl, 'WiFi SSID'),
+          _labeledField(_msanCtrl, 'MSAN No'),
+          const SizedBox(height: 4),
+          const _SubLabel('F1  ONT device photo'),
+          _keyedPhotoSlot('f1', 'ONT device'),
+          const SizedBox(height: 12),
+          const _SubLabel('F2  ONT S/N label'),
+          _keyedPhotoSlot('f2', 'S/N sticker'),
+          const SizedBox(height: 12),
+          const _SubLabel('F3  ONT install environment'),
+          _keyedPhotoSlot('f3', 'Install environment'),
+          const SizedBox(height: 12),
+          const _SubLabel('F4  Ping test'),
+          _twoPhotoRow('f4_1', 'Ping screen 1', 'f4_2', 'Ping screen 2'),
+          const SizedBox(height: 12),
+          const _SubLabel('F5  Speed test'),
+          _keyedPhotoSlot('f5', 'Speed test result'),
+          const SizedBox(height: 12),
+          const _SubLabel('F6  Call / IPTV test'),
+          _twoPhotoRow('f6_1', 'Call test 1', 'f6_2', 'Call test 2'),
+        ],
+      ),
+    );
+  }
+
+  // ── G ─────────────────────────────────────────────────────────────────────
+
+  Widget _sectionG() {
+    return SectionCard(
+      title: 'G  Cable Laying Check-list',
+      child: Column(
+        children: [
+          _labeledField(_linkIdCtrl, 'Link ID'),
+          _labeledField(_poleRangeCtrl, 'Check Area (Pole Range)', hint: 'e.g. P_001 to P_003'),
+          _labeledField(_checkAreaCtrl, 'Check Area Note', maxLines: 2),
+          _labeledField(_conclusionCtrl, 'Conclusion & Comments', maxLines: 4),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Pole entry ────────────────────────────────────────────────────────────────
+
+class _PoleEntry {
+  String? existingId;
+  EnumPoleType? type;
+  final latCtrl = TextEditingController();
+  final lngCtrl = TextEditingController();
+  String? existingImageUrl; // URL from DB
+  XFile? newImage; // locally picked, not yet uploaded
+
+  _PoleEntry();
+
+  factory _PoleEntry.fromModel(SitePoleModel p) {
+    return _PoleEntry()
+      ..existingId = p.id
+      ..type = p.enumPoleType ?? EnumPoleType.other
+      ..latCtrl.text = p.lat?.toString() ?? ''
+      ..lngCtrl.text = p.lng?.toString() ?? ''
+      ..existingImageUrl = p.image;
+  }
+}
+
+// ── Sub-section label ─────────────────────────────────────────────────────────
+
+class _SubLabel extends StatelessWidget {
+  final String text;
+  const _SubLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text(
+        text,
+        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Colors.black87),
+      ),
+    );
+  }
+}
+
+extension _StringExt on String {
+  String? get nullIfEmpty => isEmpty ? null : this;
+}
+import 'package:flutter/material.dart';
+import 'package:lmt/core/services/site_service.dart';
+import 'package:lmt/src/models/site_detail_model.dart';
+import 'package:lmt/src/views/_widgets/image_viewer_page.dart';
+import 'package:lmt/src/views/_widgets/section_card.dart';
+import 'package:lmt/src/views/sites/detail/site_detail_pdf_view_page.dart';
+
+class SiteDetailPage extends StatefulWidget {
+  final String circuitId;
+  const SiteDetailPage({super.key, required this.circuitId});
+
+  @override
+  State<SiteDetailPage> createState() => _SiteDetailPageState();
+}
+
+class _SiteDetailPageState extends State<SiteDetailPage> {
+  final _service = SupabaseSiteService();
+  SiteDetailModel? _site;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final model = await _service.getSite(widget.circuitId);
+    setState(() => _site = model);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_site == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    final site = _site!;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.circuitId, style: const TextStyle(fontSize: 14, fontFamily: 'monospace')),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.print),
+            onPressed: () async {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SiteDetailPdfViewPage(siteDetailModel: _site!),
+                ),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.edit),
+            onPressed: () async {
+              await Navigator.pushNamed(context, '/update', arguments: widget.circuitId);
+              _load();
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete),
+            onPressed: _confirmDelete,
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          padding: const EdgeInsets.only(bottom: 32),
+          children: [
+            _sectionA(site),
+            _sectionB(site),
+            _sectionC(site),
+            _sectionD(site),
+            _sectionE(site),
+            _sectionF(site),
+            _sectionG(site),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── A ────────────────────────────────────────────────────────────────────
+
+  Widget _sectionA(SiteDetailModel s) {
+    return SectionCard(
+      title: 'A  Circuit ID Information',
+      child: Column(
+        children: [
+          _row('Circuit ID', s.circuitId),
+          _row('Customer', s.customerName),
+          _row('LSP Name', s.lspName),
+          _row('Location', s.customerLat != null ? '${s.customerLat}, ${s.customerLng}' : null),
+          _row('Work Order', _fmt(s.workOrderDateTime)),
+          _row('Activation', _fmt(s.activationDateTime)),
+        ],
+      ),
+    );
+  }
+
+  // ── B ────────────────────────────────────────────────────────────────────
+
+  Widget _sectionB(SiteDetailModel s) {
+    return SectionCard(
+      title: 'B  Site / FAT Information',
+      child: Column(
+        children: [
+          _row('Survey Result', _fmt(s.surveyResultDateTime)),
+          _row('FAT Name', s.fatName),
+          _row('FAT Port', s.fatPortNumber),
+          _row('FAT Location', s.fatLat != null ? '${s.fatLat}, ${s.fatLng}' : null),
+          _divider('Optical Level – FAT Port'),
+          _row('1310nm', s.opticalLevelFatPort1310nm != null ? '${s.opticalLevelFatPort1310nm} dBm' : null),
+          _row('1490nm', s.opticalLevelFatPort1490nm != null ? '${s.opticalLevelFatPort1490nm} dBm' : null),
+          _divider('Optical Level – ATB Port'),
+          _row('1310nm', s.opticalLevelAtbPort1310nm != null ? '${s.opticalLevelAtbPort1310nm} dBm' : null),
+          _row('1490nm', s.opticalLevelAtbPort1490nm != null ? '${s.opticalLevelAtbPort1490nm} dBm' : null),
+          _row('Drop Cable', s.dropCableLengthInMeter != null ? '${s.dropCableLengthInMeter} m' : null),
+          _row('ROW Issue', s.rowIssue),
+        ],
+      ),
+    );
+  }
+
+  // ── C ────────────────────────────────────────────────────────────────────
+
+  Widget _sectionC(SiteDetailModel s) {
+    final poles = s.poles ?? [];
+    return SectionCard(
+      title: 'C  Cable Route / Poles',
+      child: poles.isEmpty
+          ? const Text('No poles recorded.', style: TextStyle(color: Colors.grey))
+          : Column(
+              children: poles.asMap().entries.map((e) {
+                final p = e.value;
+                final label = 'P_${(e.key + 1).toString().padLeft(3, '0')}  (${p.enumPoleType?.name.toUpperCase() ?? '?'})';
+                return ListTile(
+                  dense: true,
+                  leading: _poleIcon(p.enumPoleType),
+                  title: Text(label),
+                  subtitle: p.lat != null ? Text('${p.lat}, ${p.lng}', style: const TextStyle(fontSize: 12)) : null,
+                  trailing: p.image != null
+                      ? GestureDetector(
+                          onTap: () => _openPhoto(p.image!, title: s.circuitId),
+                          child: _thumb(p.image!),
+                        )
+                      : null,
+                );
+              }).toList(),
+            ),
+    );
+  }
+
+  Widget _poleIcon(EnumPoleType? t) {
+    Color color;
+    switch (t) {
+      case EnumPoleType.epc:
+        color = Colors.red;
+        break;
+      case EnumPoleType.mpt:
+        color = Colors.green;
+        break;
+      default:
+        color = Colors.blue;
+    }
+    return CircleAvatar(radius: 8, backgroundColor: color);
+  }
+
+  // ── D ────────────────────────────────────────────────────────────────────
+
+  // Replace _sectionD to include D4
+  Widget _sectionD(SiteDetailModel s) {
+    final g = s.gallery;
+    return SectionCard(
+      title: 'D  Onsite Installation – FAT',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _photoGroup('AN  Node', [g?.anNode], ['']),
+          _photoGroup('D1  Before installation', [g?.d1_1, g?.d1_2], ['FAT Closed', 'FAT Open']),
+          _photoGroup('D2  After installation', [g?.d2_1, g?.d2_2], ['View 1', 'View 2']),
+          _photoGroup('D3  Cable label inside FAT', [g?.d3_1, g?.d3_2], ['Label 1', 'Label 2']),
+          // D4 — dynamic list, generate index-based captions
+          if (g?.d4 != null && g!.d4!.isNotEmpty)
+            _photoGroup(
+              'D4  Accessories',
+              g.d4!,
+              List.generate(g.d4!.length, (i) => '${i + 1}'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ── E ────────────────────────────────────────────────────────────────────
+
+  Widget _sectionE(SiteDetailModel s) {
+    final g = s.gallery;
+    return SectionCard(
+      title: 'E  Onsite Installation – Customer Site',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _photoGroup('E1  Outdoor cable', [g?.e1], ['']),
+          _photoGroup('E2  Home entrance', [g?.e2], ['']),
+          _photoGroup('E3  Indoor cable', [g?.e3], ['']),
+          _photoGroup('E4  Cable coils', [g?.e4_1, g?.e4_2], ['Customer side', 'FAT side']),
+          _photoGroup('E5  ATB', [g?.e5], ['']),
+          _photoGroup('E6  Other remarks', [g?.e6_1, g?.e6_2, g?.e6_3], ['1', '2', '3']),
+        ],
+      ),
+    );
+  }
+
+  // ── F ────────────────────────────────────────────────────────────────────
+
+  Widget _sectionF(SiteDetailModel s) {
+    final g = s.gallery;
+    return SectionCard(
+      title: 'F  ONT Test & Service Test',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _row('ONT S/N', s.ontSnNumber),
+          _row('Splitter No', s.splitterNo),
+          _row('WiFi SSID', s.wifiSsid),
+          _row('MSAN', s.msan),
+          const SizedBox(height: 8),
+          _photoGroup('F1  ONT device', [g?.f1], ['']),
+          _photoGroup('F2  S/N label', [g?.f2], ['']),
+          _photoGroup('F3  Environment', [g?.f3], ['']),
+          _photoGroup('F4  Ping test', [g?.f4_1, g?.f4_2], ['1', '2']),
+          _photoGroup('F5  Speed test', [g?.f5], ['']),
+          _photoGroup('F6  Call / IPTV test', [g?.f6_1, g?.f6_2], ['1', '2']),
+        ],
+      ),
+    );
+  }
+
+  // ── G ────────────────────────────────────────────────────────────────────
+
+  Widget _sectionG(SiteDetailModel s) {
+    return SectionCard(
+      title: 'G  Cable Laying Check-list',
+      child: Column(
+        children: [
+          _row('Link ID', s.linkId),
+          _row('Check Area', s.poleRange ?? s.checkArea),
+          if (s.conclusionAndComments != null) ...[
+            const Divider(),
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text('Conclusion & Comments', style: TextStyle(fontWeight: FontWeight.w600)),
+            ),
+            const SizedBox(height: 4),
+            Text(s.conclusionAndComments!),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ── Shared widgets ────────────────────────────────────────────────────────
+
+  Widget _row(String label, String? value) {
+    if (value == null || value.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(label, style: const TextStyle(color: Colors.grey, fontSize: 13)),
+          ),
+          Expanded(
+            child: Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _divider(String label) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Text(
+        label,
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.blueGrey),
+      ),
+    );
+  }
+
+  Widget _photoGroup(String title, List<String?> urls, List<String> captions) {
+    final valid = urls.where((u) => u != null && u.isNotEmpty).toList();
+    if (valid.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: urls.asMap().entries.where((e) => e.value != null && e.value!.isNotEmpty).map((e) {
+              final url = e.value!;
+              final cap = e.key < captions.length ? captions[e.key] : '';
+              return GestureDetector(
+                onTap: () => _openPhoto(url, title: title),
+                child: Column(
+                  children: [
+                    _thumb(url),
+                    if (cap.isNotEmpty) Text(cap, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _thumb(String url) {
+    return Hero(
+      tag: url,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(6),
+        child: Image.network(
+          url,
+          width: 100,
+          height: 80,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Container(
+            width: 100,
+            height: 80,
+            color: Colors.grey.shade200,
+            child: const Icon(Icons.broken_image),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openPhoto(String url, {String? title}) {
+    openImageViewer(
+      context: context,
+      url: url,
+      title: title ?? 'Photo',
+    );
+  }
+
+  Future<void> _confirmDelete() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete site?'),
+        content: Text('Delete ${widget.circuitId}? This cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await _service.deleteSite(widget.circuitId);
+      if (mounted) Navigator.pop(context);
+    }
+  }
+
+  String? _fmt(DateTime? dt) {
+    if (dt == null) return null;
+    return '${dt.year}/${_p(dt.month)}/${_p(dt.day)}  ${_p(dt.hour)}:${_p(dt.minute)}';
+  }
+
+  String _p(int n) => n.toString().padLeft(2, '0');
+}
+import 'package:flutter/material.dart';
+import 'package:lmt/src/models/site_detail_model.dart';
+
+class SiteDetailPdfViewPage extends StatelessWidget {
+  final SiteDetailModel siteDetailModel;
+
+  const SiteDetailPdfViewPage({
+    super.key,
+    required this.siteDetailModel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(siteDetailModel.circuitId),
+      ),
+    );
+  }
+}
+import 'package:flutter/material.dart';
+import 'package:lmt/core/services/site_service.dart';
+
+class SiteListPage extends StatefulWidget {
+  const SiteListPage({super.key});
+
+  @override
+  State<SiteListPage> createState() => _SiteListPageState();
+}
+
+class _SiteListPageState extends State<SiteListPage> {
+  final _service = SupabaseSiteService();
+  final List<Map<String, dynamic>> _sites = [];
+  final _scrollCtrl = ScrollController();
+
+  int _page = 0;
+  bool _loading = false;
+  bool _hasMore = true;
+  static const _limit = 20;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchMore();
+    _scrollCtrl.addListener(() {
+      if (_scrollCtrl.position.pixels >= _scrollCtrl.position.maxScrollExtent - 200) {
+        _fetchMore();
+      }
+    });
+  }
+
+  Future<void> _fetchMore() async {
+    if (_loading || !_hasMore) return;
+    setState(() => _loading = true);
+
+    final data = await _service.listSites(page: _page, limit: _limit);
+
+    setState(() {
+      _sites.addAll(data);
+      _page++;
+      _loading = false;
+      if (data.length < _limit) _hasMore = false;
+    });
+  }
+
+  Future<void> _refresh() async {
+    setState(() {
+      _sites.clear();
+      _page = 0;
+      _hasMore = true;
+    });
+    await _fetchMore();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('FTTH Sites')),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          await Navigator.pushNamed(context, '/create');
+          _refresh();
+        },
+        child: const Icon(Icons.add),
+      ),
+      body: RefreshIndicator(
+        onRefresh: _refresh,
+        child: _sites.isEmpty && !_loading
+            ? const Center(child: Text('No sites yet. Tap + to create one.'))
+            : ListView.separated(
+                controller: _scrollCtrl,
+                itemCount: _sites.length + (_loading ? 1 : 0),
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  if (index == _sites.length) {
+                    return const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+                  final site = _sites[index];
+                  return ListTile(
+                    leading: const CircleAvatar(
+                      backgroundColor: Color(0xFF1565C0),
+                      child: Icon(Icons.cell_tower, color: Colors.white, size: 18),
+                    ),
+                    title: Text(
+                      site['circuit_id'] ?? '',
+                      style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (site['customer_name'] != null) Text(site['customer_name']),
+                        if (site['lsp_name'] != null) Text(site['lsp_name'], style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      ],
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () async {
+                      await Navigator.pushNamed(context, '/detail', arguments: site['circuit_id']);
+                      _refresh();
+                    },
+                  );
+                },
+              ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
+}
+import 'dart:typed_data';
+
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:lmt/core/repositories/site_repository.dart';
+import 'package:lmt/core/services/site_service.dart';
+import 'package:lmt/core/services/storage_service.dart';
+import 'package:lmt/src/models/site_detail_model.dart';
+import 'package:lmt/src/views/_widgets/image_viewer_page.dart';
+import 'package:lmt/src/views/_widgets/section_card.dart';
+
+class SiteCreatePage extends StatefulWidget {
+  const SiteCreatePage({super.key});
+
+  @override
+  State<SiteCreatePage> createState() => _SiteCreatePageState();
+}
+
+class _SiteCreatePageState extends State<SiteCreatePage> {
+  final _picker = ImagePicker();
+  final _storage = StorageService();
+  final _repo = SiteRepository(SupabaseSiteService());
+
+  bool _saving = false;
+
+  // ── A: Circuit Info ──────────────────────────────────────────────────────
+  final _circuitIdCtrl = TextEditingController();
+  final _customerNameCtrl = TextEditingController();
+  final _lspNameCtrl = TextEditingController();
+  final _customerLatCtrl = TextEditingController();
+  final _customerLngCtrl = TextEditingController();
+  DateTime? _workOrderDate;
+  DateTime? _activationDate;
+
+  // ── B: Site / FAT Info ───────────────────────────────────────────────────
+  DateTime? _surveyDate;
+  final _fatNameCtrl = TextEditingController();
+  final _fatPortCtrl = TextEditingController();
+  final _fatLatCtrl = TextEditingController();
+  final _fatLngCtrl = TextEditingController();
+  final _optFat1310Ctrl = TextEditingController();
+  final _optFat1490Ctrl = TextEditingController();
+  final _optAtb1310Ctrl = TextEditingController();
+  final _optAtb1490Ctrl = TextEditingController();
+  final _dropCableCtrl = TextEditingController();
+  final _rowIssueCtrl = TextEditingController();
+
+  // ── Additional ───────────────────────────────────────────────────────────
+  final _ontSnCtrl = TextEditingController();
+  final _splitterCtrl = TextEditingController();
+  final _wifiSsidCtrl = TextEditingController();
+  final _msanCtrl = TextEditingController();
+  final _linkIdCtrl = TextEditingController();
+  final _poleRangeCtrl = TextEditingController();
+
+  // ── G: Pole check-list ───────────────────────────────────────────────────
+  final _checkAreaCtrl = TextEditingController();
+  final _conclusionCtrl = TextEditingController();
+
+  // ── Poles (C) ────────────────────────────────────────────────────────────
+  final List<_PoleEntry> _poles = [];
+
+  // ── Gallery ──────────────────────────────────────────────────────────────
+  // Keyed single-slot photos
+  final Map<String, XFile?> _gallery = {};
+  // D4 accessories — dynamic list (0..*)
+  final List<XFile> _d4Images = [];
+
+  // ── Image picker shared ───────────────────────────────────────────────────
+
+  Future<XFile?> _pickImageFromSource() async {
+    final src = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Camera'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Gallery'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (src == null) return null;
+    return _picker.pickImage(source: src, imageQuality: 80);
+  }
+
+  Future<void> _pickGalleryImage(String key) async {
+    final picked = await _pickImageFromSource();
+    if (picked != null) setState(() => _gallery[key] = picked);
+  }
+
+  Future<void> _pickD4Image() async {
+    final picked = await _pickImageFromSource();
+    if (picked != null) setState(() => _d4Images.add(picked));
+  }
+
+  Future<void> _pickPoleImage(int index) async {
+    final picked = await _pickImageFromSource();
+    if (picked != null) setState(() => _poles[index].image = picked);
+  }
+
+  // ── Shared photo slot widget ──────────────────────────────────────────────
+
+  Widget _photoSlot({
+    required BuildContext context,
+    required XFile? file,
+    required String label,
+    required VoidCallback onTap,
+    required VoidCallback onRemove,
+  }) {
+    return GestureDetector(
+      onTap: () async {
+        if (file == null) {
+          onTap();
+          return;
+        }
+        final bytes = await file.readAsBytes();
+        if (context.mounted) {
+          openImageViewer(context: context, bytes: bytes, title: label);
+        }
+      },
+      child: Container(
+        width: double.infinity,
+        constraints: const BoxConstraints(minHeight: 100, maxHeight: 200),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(8),
+          color: Colors.grey.shade100,
+        ),
+        child: file != null
+            ? FutureBuilder<Uint8List>(
+                future: file.readAsBytes(),
+                builder: (context, snap) {
+                  if (!snap.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  return Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.memory(snap.data!, fit: BoxFit.contain),
+                      ),
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: GestureDetector(
+                          onTap: onRemove,
+                          child: const CircleAvatar(
+                            radius: 12,
+                            backgroundColor: Colors.red,
+                            child: Icon(Icons.close, size: 14, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              )
+            : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.add_a_photo, color: Colors.grey),
+                  const SizedBox(height: 4),
+                  Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+
+  // Gallery key-based convenience wrappers
+  Widget _keyedPhotoSlot(String key, String label) {
+    return _photoSlot(
+      context: context,
+      file: _gallery[key],
+      label: label,
+      onTap: () => _pickGalleryImage(key),
+      onRemove: () => setState(() => _gallery[key] = null),
+    );
+  }
+
+  Widget _twoPhotoRow(String key1, String label1, String key2, String label2) {
+    return Row(
+      children: [
+        Expanded(child: _keyedPhotoSlot(key1, label1)),
+        const SizedBox(width: 8),
+        Expanded(child: _keyedPhotoSlot(key2, label2)),
+      ],
+    );
+  }
+
+  Widget _labeledField(
+    TextEditingController ctrl,
+    String label, {
+    TextInputType type = TextInputType.text,
+    String? hint,
+    int maxLines = 1,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextField(
+        controller: ctrl,
+        keyboardType: type,
+        maxLines: maxLines,
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: hint,
+          border: const OutlineInputBorder(),
+          isDense: true,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickDate(BuildContext context, void Function(DateTime) onPicked) async {
+    final d = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+    );
+    if (d == null) return;
+    final t = await showTimePicker(context: context, initialTime: TimeOfDay.now());
+    if (t == null) return;
+    onPicked(DateTime(d.year, d.month, d.day, t.hour, t.minute));
+  }
+
+  Widget _dateTile(String label, DateTime? value, void Function(DateTime) onPicked) {
+    return ListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      title: Text(label),
+      subtitle: Text(
+        value != null ? '${value.year}/${_pad(value.month)}/${_pad(value.day)}  ${_pad(value.hour)}:${_pad(value.minute)}' : 'Tap to set',
+        style: TextStyle(color: value != null ? Colors.black87 : Colors.grey),
+      ),
+      trailing: const Icon(Icons.calendar_today, size: 18),
+      onTap: () => _pickDate(context, onPicked),
+    );
+  }
+
+  String _pad(int n) => n.toString().padLeft(2, '0');
+
+  // ── SAVE ─────────────────────────────────────────────────────────────────
+
+  Future<void> _save() async {
+    final circuitId = _circuitIdCtrl.text.trim();
+    if (circuitId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Circuit ID is required')),
+      );
+      return;
+    }
+
+    setState(() => _saving = true);
+
+    try {
+      final model = SiteDetailModel(circuitId: circuitId)
+        ..customerName = _customerNameCtrl.text.trim().nullIfEmpty
+        ..lspName = _lspNameCtrl.text.trim().nullIfEmpty
+        ..customerLat = double.tryParse(_customerLatCtrl.text)
+        ..customerLng = double.tryParse(_customerLngCtrl.text)
+        ..workOrderDateTime = _workOrderDate
+        ..activationDateTime = _activationDate
+        ..surveyResultDateTime = _surveyDate
+        ..fatName = _fatNameCtrl.text.trim().nullIfEmpty
+        ..fatPortNumber = _fatPortCtrl.text.trim().nullIfEmpty
+        ..fatLat = double.tryParse(_fatLatCtrl.text)
+        ..fatLng = double.tryParse(_fatLngCtrl.text)
+        ..opticalLevelFatPort1310nm = double.tryParse(_optFat1310Ctrl.text)
+        ..opticalLevelFatPort1490nm = double.tryParse(_optFat1490Ctrl.text)
+        ..opticalLevelAtbPort1310nm = double.tryParse(_optAtb1310Ctrl.text)
+        ..opticalLevelAtbPort1490nm = double.tryParse(_optAtb1490Ctrl.text)
+        ..dropCableLengthInMeter = _dropCableCtrl.text.trim().nullIfEmpty
+        ..rowIssue = _rowIssueCtrl.text.trim().nullIfEmpty
+        ..ontSnNumber = _ontSnCtrl.text.trim().nullIfEmpty
+        ..splitterNo = _splitterCtrl.text.trim().nullIfEmpty
+        ..wifiSsid = _wifiSsidCtrl.text.trim().nullIfEmpty
+        ..msan = _msanCtrl.text.trim().nullIfEmpty
+        ..linkId = _linkIdCtrl.text.trim().nullIfEmpty
+        ..poleRange = _poleRangeCtrl.text.trim().nullIfEmpty
+        ..checkArea = _checkAreaCtrl.text.trim().nullIfEmpty
+        ..conclusionAndComments = _conclusionCtrl.text.trim().nullIfEmpty;
+
+      // ── Upload keyed single-slot gallery images ───────────────────────────
+      final gallery = SiteGalleryModel(circuitId: circuitId);
+      for (final key in _gallery.keys) {
+        final file = _gallery[key];
+        if (file == null) continue;
+        final url = await _storage.uploadImage(
+          circuitId: circuitId,
+          bytes: await file.readAsBytes(),
+          folder: key,
+        );
+        _setGalleryUrl(gallery, key, url);
+      }
+
+      // ── Upload AN node image ──────────────────────────────────────────────
+      final anFile = _gallery['an_node'];
+      if (anFile != null) {
+        final url = await _storage.uploadImage(
+          circuitId: circuitId,
+          bytes: await anFile.readAsBytes(),
+          folder: 'an_node',
+        );
+        gallery.anNode = url;
+      }
+
+      // ── Upload D4 accessories images (dynamic list) ───────────────────────
+      final d4Urls = <String>[];
+      for (int i = 0; i < _d4Images.length; i++) {
+        final url = await _storage.uploadImage(
+          circuitId: circuitId,
+          bytes: await _d4Images[i].readAsBytes(),
+          folder: 'd4_${(i + 1).toString().padLeft(3, '0')}',
+        );
+        if (url != null) d4Urls.add(url);
+      }
+      gallery.d4 = d4Urls.isEmpty ? null : d4Urls;
+
+      model.gallery = gallery;
+
+      // ── Upload pole images and build pole list ────────────────────────────
+      model.poles = await Future.wait(
+        _poles.asMap().entries.map((e) async {
+          final index = e.key;
+          final p = e.value;
+          String? imageUrl;
+          if (p.image != null) {
+            imageUrl = await _storage.uploadImage(
+              circuitId: circuitId,
+              bytes: await p.image!.readAsBytes(),
+              folder: 'pole_${(index + 1).toString().padLeft(3, '0')}',
+            );
+          }
+          return SitePoleModel(
+            circuitId: circuitId,
+            enumPoleType: p.type,
+            lat: double.tryParse(p.latCtrl.text),
+            lng: double.tryParse(p.lngCtrl.text),
+            image: imageUrl,
+          );
+        }),
+      );
+
+      await _repo.saveSite(model);
+
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  // Maps a string key to the corresponding SiteGalleryModel field.
+  // D4 and anNode are handled separately (list upload & direct assign).
+  void _setGalleryUrl(SiteGalleryModel g, String key, String? url) {
+    switch (key) {
+      case 'd1_1':
+        g.d1_1 = url;
+        break;
+      case 'd1_2':
+        g.d1_2 = url;
+        break;
+      case 'd2_1':
+        g.d2_1 = url;
+        break;
+      case 'd2_2':
+        g.d2_2 = url;
+        break;
+      case 'd3_1':
+        g.d3_1 = url;
+        break;
+      case 'd3_2':
+        g.d3_2 = url;
+        break;
+      case 'e1':
+        g.e1 = url;
+        break;
+      case 'e2':
+        g.e2 = url;
+        break;
+      case 'e3':
+        g.e3 = url;
+        break;
+      case 'e4_1':
+        g.e4_1 = url;
+        break;
+      case 'e4_2':
+        g.e4_2 = url;
+        break;
+      case 'e5':
+        g.e5 = url;
+        break;
+      case 'e6_1':
+        g.e6_1 = url;
+        break;
+      case 'e6_2':
+        g.e6_2 = url;
+        break;
+      case 'e6_3':
+        g.e6_3 = url;
+        break;
+      case 'f1':
+        g.f1 = url;
+        break;
+      case 'f2':
+        g.f2 = url;
+        break;
+      case 'f3':
+        g.f3 = url;
+        break;
+      case 'f4_1':
+        g.f4_1 = url;
+        break;
+      case 'f4_2':
+        g.f4_2 = url;
+        break;
+      case 'f5':
+        g.f5 = url;
+        break;
+      case 'f6_1':
+        g.f6_1 = url;
+        break;
+      case 'f6_2':
+        g.f6_2 = url;
+        break;
+      // an_node and d4 are handled outside this switch
+    }
+  }
+
+  // ── BUILD ─────────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Create Site'),
+        actions: [
+          if (_saving)
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              ),
+            )
+          else
+            IconButton(onPressed: _save, icon: const Icon(Icons.save)),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.only(bottom: 32),
+        children: [
+          _sectionA(),
+          _sectionB(),
+          _sectionC(),
+          _sectionD(),
+          _sectionE(),
+          _sectionF(),
+          _sectionG(),
+        ],
+      ),
+    );
+  }
+
+  // ── A ─────────────────────────────────────────────────────────────────────
+
+  Widget _sectionA() {
+    return SectionCard(
+      title: 'A  Circuit ID Information',
+      child: Column(
+        children: [
+          _labeledField(_circuitIdCtrl, 'Circuit ID *', hint: 'e.g. FTTH-323412-TKI-BC'),
+          _labeledField(_customerNameCtrl, 'Customer Name'),
+          _labeledField(_lspNameCtrl, 'LSP Name'),
+          Row(
+            children: [
+              Expanded(child: _labeledField(_customerLatCtrl, 'Cust. Lat', type: const TextInputType.numberWithOptions(decimal: true, signed: true))),
+              const SizedBox(width: 8),
+              Expanded(child: _labeledField(_customerLngCtrl, 'Cust. Long', type: const TextInputType.numberWithOptions(decimal: true, signed: true))),
+            ],
+          ),
+          _dateTile('Work Order Date/Time', _workOrderDate, (d) => setState(() => _workOrderDate = d)),
+          _dateTile('Activation Date', _activationDate, (d) => setState(() => _activationDate = d)),
+        ],
+      ),
+    );
+  }
+
+  // ── B ─────────────────────────────────────────────────────────────────────
+
+  Widget _sectionB() {
+    return SectionCard(
+      title: 'B  Site / FAT Information',
+      child: Column(
+        children: [
+          _dateTile('Survey Result Date', _surveyDate, (d) => setState(() => _surveyDate = d)),
+          _labeledField(_fatNameCtrl, 'FAT Name', hint: 'e.g. YGN-TKI1302-8'),
+          _labeledField(_fatPortCtrl, 'FAT Port Number', hint: 'e.g. Port-5'),
+          Row(
+            children: [
+              Expanded(child: _labeledField(_fatLatCtrl, 'FAT Lat', type: const TextInputType.numberWithOptions(decimal: true, signed: true))),
+              const SizedBox(width: 8),
+              Expanded(child: _labeledField(_fatLngCtrl, 'FAT Long', type: const TextInputType.numberWithOptions(decimal: true, signed: true))),
+            ],
+          ),
+          const Text('Optical Level at FAT Port', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(child: _labeledField(_optFat1310Ctrl, '1310nm (dBm)', type: const TextInputType.numberWithOptions(decimal: true, signed: true))),
+              const SizedBox(width: 8),
+              Expanded(child: _labeledField(_optFat1490Ctrl, '1490nm (dBm)', type: const TextInputType.numberWithOptions(decimal: true, signed: true))),
+            ],
+          ),
+          const Text('Optical Level at ATB Port', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(child: _labeledField(_optAtb1310Ctrl, '1310nm (dBm)', type: const TextInputType.numberWithOptions(decimal: true, signed: true))),
+              const SizedBox(width: 8),
+              Expanded(child: _labeledField(_optAtb1490Ctrl, '1490nm (dBm)', type: const TextInputType.numberWithOptions(decimal: true, signed: true))),
+            ],
+          ),
+          _labeledField(_dropCableCtrl, 'Drop Cable Length (m)', type: TextInputType.number),
+          _labeledField(_rowIssueCtrl, 'ROW Issue', hint: 'No Issue'),
+        ],
+      ),
+    );
+  }
+
+  // ── C: Poles ──────────────────────────────────────────────────────────────
+
+  Widget _sectionC() {
+    return SectionCard(
+      title: 'C  Cable Route / Poles',
+      child: Column(
+        children: [
+          ..._poles.asMap().entries.map((e) => _poleRow(e.key, e.value)),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () => setState(() => _poles.add(_PoleEntry())),
+            icon: const Icon(Icons.add),
+            label: const Text('Add Pole'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _poleRow(int index, _PoleEntry entry) {
+    final poleLabel = 'P_${(index + 1).toString().padLeft(3, '0')}';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(poleLabel, style: const TextStyle(fontWeight: FontWeight.bold)),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.delete, size: 18, color: Colors.red),
+                onPressed: () => setState(() => _poles.removeAt(index)),
+              ),
+            ],
+          ),
+          DropdownButtonFormField<EnumPoleType>(
+            value: entry.type,
+            decoration: const InputDecoration(
+              labelText: 'Pole Type',
+              isDense: true,
+              border: OutlineInputBorder(),
+            ),
+            items: EnumPoleType.values.map((t) => DropdownMenuItem(value: t, child: Text(t.name.toUpperCase()))).toList(),
+            onChanged: (v) => setState(() => entry.type = v),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: entry.latCtrl,
+                  decoration: const InputDecoration(labelText: 'Latitude', isDense: true, border: OutlineInputBorder()),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: entry.lngCtrl,
+                  decoration: const InputDecoration(labelText: 'Longitude', isDense: true, border: OutlineInputBorder()),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Pole Photo',
+            style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 4),
+          _photoSlot(
+            context: context,
+            file: entry.image,
+            label: 'Tap to add $poleLabel photo',
+            onTap: () => _pickPoleImage(index),
+            onRemove: () => setState(() => _poles[index].image = null),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── D ─────────────────────────────────────────────────────────────────────
+
+  Widget _sectionD() {
+    return SectionCard(
+      title: 'D  Onsite Installation – FAT',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── AN Node ───────────────────────────────────────────────────────
+          const _SubLabel('AN  Node photo'),
+          _keyedPhotoSlot('an_node', 'AN Node'),
+          const SizedBox(height: 12),
+
+          // ── D1 ────────────────────────────────────────────────────────────
+          const _SubLabel('D1  FAT before installation'),
+          _twoPhotoRow('d1_1', 'FAT Closed', 'd1_2', 'FAT Open'),
+          const SizedBox(height: 12),
+
+          // ── D2 ────────────────────────────────────────────────────────────
+          const _SubLabel('D2  FAT after installation'),
+          _twoPhotoRow('d2_1', 'View 1', 'd2_2', 'View 2'),
+          const SizedBox(height: 12),
+
+          // ── D3 ────────────────────────────────────────────────────────────
+          const _SubLabel('D3  Cable label inside FAT'),
+          _twoPhotoRow('d3_1', 'Label 1', 'd3_2', 'Label 2'),
+          const SizedBox(height: 12),
+
+          // ── D4  (dynamic list — same pattern as poles) ────────────────────
+          const _SubLabel('D4  Accessories (clamp / hook / buckle)'),
+          ..._d4Images.asMap().entries.map(
+            (e) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _photoSlot(
+                context: context,
+                file: e.value,
+                label: 'Accessories photo ${e.key + 1}',
+                onTap: () {},
+                onRemove: () => setState(() => _d4Images.removeAt(e.key)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          OutlinedButton.icon(
+            onPressed: _pickD4Image,
+            icon: const Icon(Icons.add_a_photo, size: 16),
+            label: const Text('Add D4 Photo'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── E ─────────────────────────────────────────────────────────────────────
+
+  Widget _sectionE() {
+    return SectionCard(
+      title: 'E  Onsite Installation – Customer Site',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SubLabel('E1  Outdoor cable (include FAT in frame)'),
+          _keyedPhotoSlot('e1', 'Outdoor cable route'),
+          const SizedBox(height: 12),
+          const _SubLabel('E2  Customer home entrance cable'),
+          _keyedPhotoSlot('e2', 'Home entrance'),
+          const SizedBox(height: 12),
+          const _SubLabel('E3  Indoor cable (entrance → ATB)'),
+          _keyedPhotoSlot('e3', 'Indoor cable'),
+          const SizedBox(height: 12),
+          const _SubLabel('E4  Cable coils'),
+          _twoPhotoRow('e4_1', 'At customer side', 'e4_2', 'At FAT side'),
+          const SizedBox(height: 12),
+          const _SubLabel('E5  ATB'),
+          _keyedPhotoSlot('e5', 'ATB photo'),
+          const SizedBox(height: 12),
+          const _SubLabel('E6  Other remarks'),
+          Row(
+            children: [
+              Expanded(child: _keyedPhotoSlot('e6_1', 'Photo 1')),
+              const SizedBox(width: 8),
+              Expanded(child: _keyedPhotoSlot('e6_2', 'Photo 2')),
+              const SizedBox(width: 8),
+              Expanded(child: _keyedPhotoSlot('e6_3', 'Photo 3')),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── F ─────────────────────────────────────────────────────────────────────
+
+  Widget _sectionF() {
+    return SectionCard(
+      title: 'F  ONT Test & Service Test',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _labeledField(_ontSnCtrl, 'ONT S/N Number', hint: 'e.g. 4857544307DD03AE'),
+          _labeledField(_splitterCtrl, 'Splitter No'),
+          _labeledField(_wifiSsidCtrl, 'WiFi SSID'),
+          _labeledField(_msanCtrl, 'MSAN No'),
+          const SizedBox(height: 4),
+          const _SubLabel('F1  ONT device photo'),
+          _keyedPhotoSlot('f1', 'ONT device'),
+          const SizedBox(height: 12),
+          const _SubLabel('F2  ONT S/N label'),
+          _keyedPhotoSlot('f2', 'S/N sticker'),
+          const SizedBox(height: 12),
+          const _SubLabel('F3  ONT install environment'),
+          _keyedPhotoSlot('f3', 'Install environment'),
+          const SizedBox(height: 12),
+          const _SubLabel('F4  Ping test'),
+          _twoPhotoRow('f4_1', 'Ping screen 1', 'f4_2', 'Ping screen 2'),
+          const SizedBox(height: 12),
+          const _SubLabel('F5  Speed test'),
+          _keyedPhotoSlot('f5', 'Speed test result'),
+          const SizedBox(height: 12),
+          const _SubLabel('F6  Call / IPTV test'),
+          _twoPhotoRow('f6_1', 'Call test 1', 'f6_2', 'Call test 2'),
+        ],
+      ),
+    );
+  }
+
+  // ── G ─────────────────────────────────────────────────────────────────────
+
+  Widget _sectionG() {
+    return SectionCard(
+      title: 'G  Cable Laying Check-list',
+      child: Column(
+        children: [
+          _labeledField(_linkIdCtrl, 'Link ID'),
+          _labeledField(_poleRangeCtrl, 'Check Area (Pole Range)', hint: 'e.g. P_001 to P_003'),
+          _labeledField(_checkAreaCtrl, 'Check Area Note', maxLines: 2),
+          _labeledField(_conclusionCtrl, 'Conclusion & Comments', maxLines: 4),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Pole entry data holder ────────────────────────────────────────────────────
+
+class _PoleEntry {
+  EnumPoleType? type = EnumPoleType.other;
+  final latCtrl = TextEditingController();
+  final lngCtrl = TextEditingController();
+  XFile? image;
+}
+
+// ── Sub-section label ─────────────────────────────────────────────────────────
+
+class _SubLabel extends StatelessWidget {
+  final String text;
+  const _SubLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text(
+        text,
+        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Colors.black87),
+      ),
+    );
+  }
+}
+
+extension _StringExt on String {
+  String? get nullIfEmpty => isEmpty ? null : this;
+}
