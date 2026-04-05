@@ -115,10 +115,13 @@ class _SiteDetailPageState extends State<SiteDetailPage> {
   // - map ---
   Widget _mapSection(BuildContext context, SiteDetailModel site) {
     final poles = site.poles ?? [];
-    return Screenshot(
-      controller: _screenshotController,
-      child: AspectRatio(
-        aspectRatio: 16 / 12,
+    final size = MediaQuery.of(context).size;
+    return SizedBox(
+      width: size.aspectRatio > 1 ? min(200, size.width) : size.width,
+      height: size.aspectRatio > 1 ? min(400, (size.width / 2)) : size.width,
+
+      child: Screenshot(
+        controller: _screenshotController,
         child: LayoutBuilder(
           builder: (a1, c1) {
             return Column(
