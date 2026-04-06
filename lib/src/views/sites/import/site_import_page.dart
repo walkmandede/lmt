@@ -1,7 +1,10 @@
 import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:lmt/core/repositories/site_repository.dart';
+import 'package:lmt/core/services/site_service.dart';
 import 'package:lmt/src/models/site_detail_model.dart';
+import 'package:lmt/src/views/sites/detail/site_detail_page.dart';
 
 class SiteImportPage extends StatefulWidget {
   const SiteImportPage({super.key});
@@ -11,9 +14,95 @@ class SiteImportPage extends StatefulWidget {
 }
 
 class _SiteImportPageState extends State<SiteImportPage> {
+  final _repo = SiteRepository(SupabaseSiteService());
+
   List<SiteDetailModel> sites = [];
+  final Set<int> _selectedIndexes = {};
   String? error;
   bool isLoading = false;
+  bool isCreating = false;
+
+  bool get _allSelected => sites.isNotEmpty && _selectedIndexes.length == sites.length;
+
+  void _toggleSelectAll() {
+    setState(() {
+      if (_allSelected) {
+        _selectedIndexes.clear();
+      } else {
+        _selectedIndexes.addAll(List.generate(sites.length, (i) => i));
+      }
+    });
+  }
+
+  void _toggleSelect(int index) {
+    setState(() {
+      if (_selectedIndexes.contains(index)) {
+        _selectedIndexes.remove(index);
+      } else {
+        _selectedIndexes.add(index);
+      }
+    });
+  }
+
+  // ── Create Sites ──────────────────────────────────────────────────────────
+
+  Future<void> _createSites() async {
+    if (_selectedIndexes.isEmpty) return;
+
+    setState(() => isCreating = true);
+
+    final selected = _selectedIndexes.map((i) => sites[i]).toList();
+
+    int successCount = 0;
+    final List<String> failedIds = [];
+
+    for (final site in selected) {
+      try {
+        await _repo.saveSite(site);
+        successCount++;
+      } catch (e) {
+        failedIds.add(site.circuitId);
+      }
+    }
+
+    if (!mounted) return;
+
+    setState(() => isCreating = false);
+
+    if (failedIds.isEmpty) {
+      // All succeeded — clear the list
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$successCount site(s) created successfully.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      setState(() {
+        sites.clear();
+        _selectedIndexes.clear();
+      });
+    } else {
+      // Partial failure — keep failed ones in list
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '$successCount created. ${failedIds.length} failed: ${failedIds.join(', ')}',
+          ),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 6),
+        ),
+      );
+
+      // Remove successful ones, keep failed ones
+      setState(() {
+        final failedSet = failedIds.toSet();
+        sites.removeWhere((s) => !failedSet.contains(s.circuitId));
+        _selectedIndexes.clear();
+      });
+    }
+  }
+
+  // ── File Picker ───────────────────────────────────────────────────────────
 
   Future<void> pickAndParseFile() async {
     try {
@@ -37,21 +126,24 @@ class _SiteImportPageState extends State<SiteImportPage> {
       if (bytes == null) throw Exception("Cannot read file");
 
       final content = utf8.decode(bytes);
-
       final parsed = parseTsv(content);
 
       setState(() {
         sites = parsed;
+        _selectedIndexes.clear();
         isLoading = false;
       });
     } catch (e) {
       setState(() {
         sites = [];
+        _selectedIndexes.clear();
         error = e.toString();
         isLoading = false;
       });
     }
   }
+
+  // ── TSV Parser ────────────────────────────────────────────────────────────
 
   List<SiteDetailModel> parseTsv(String content) {
     final lines = const LineSplitter().convert(content);
@@ -67,9 +159,7 @@ class _SiteImportPageState extends State<SiteImportPage> {
     ];
 
     for (final h in requiredHeaders) {
-      if (!headers.contains(h)) {
-        throw Exception("Missing column: $h");
-      }
+      if (!headers.contains(h)) throw Exception("Missing column: $h");
     }
 
     final List<SiteDetailModel> result = [];
@@ -86,7 +176,6 @@ class _SiteImportPageState extends State<SiteImportPage> {
       final fatOptical = _parseOptical(map['dB Loss At Splitter']);
       final atbOptical = _parseOptical(map['dB Loss At ATB']);
 
-      /// 🔥 Build JSON that matches YOUR model
       final json = <String, dynamic>{
         'circuit_id': map['Circuit ID'],
         'customer_name': map['Customer Name'],
@@ -114,26 +203,20 @@ class _SiteImportPageState extends State<SiteImportPage> {
     return result;
   }
 
-  /// Parse: -19.34dBm(1310),-19.74dBm(1490)
   (double?, double?) _parseOptical(String? value) {
     if (value == null) return (null, null);
-
     try {
       final parts = value.split(',');
-
       double? v1310;
       double? v1490;
-
       for (final p in parts) {
         final clean = p.replaceAll('dBm', '');
-
         if (clean.contains('(1310)')) {
           v1310 = double.tryParse(clean.replaceAll('(1310)', ''));
         } else if (clean.contains('(1490)')) {
           v1490 = double.tryParse(clean.replaceAll('(1490)', ''));
         }
       }
-
       return (v1310, v1490);
     } catch (_) {
       return (null, null);
@@ -142,21 +225,12 @@ class _SiteImportPageState extends State<SiteImportPage> {
 
   DateTime? _parseDate(String? value) {
     if (value == null) return null;
-
     try {
-      if (value.contains(',')) {
-        return DateTime.parse(_convertToIso(value));
-      }
-
+      if (value.contains(',')) return DateTime.parse(_convertToIso(value));
       final parts = value.split('/');
       if (parts.length == 3) {
-        return DateTime(
-          int.parse(parts[2]),
-          int.parse(parts[0]),
-          int.parse(parts[1]),
-        );
+        return DateTime(int.parse(parts[2]), int.parse(parts[0]), int.parse(parts[1]));
       }
-
       return DateTime.tryParse(value);
     } catch (_) {
       return null;
@@ -165,30 +239,55 @@ class _SiteImportPageState extends State<SiteImportPage> {
 
   String _convertToIso(String input) {
     final parts = input.split(',');
-
     final date = parts[0].trim().split('/');
     final time = parts[1].trim();
-
     final month = date[0].padLeft(2, '0');
     final day = date[1].padLeft(2, '0');
     final year = date[2];
-
     final isPM = time.contains('PM');
     final t = time.replaceAll(RegExp(r'AM|PM'), '').trim().split(':');
-
     int hour = int.parse(t[0]);
     final minute = t[1];
-
     if (isPM && hour != 12) hour += 12;
     if (!isPM && hour == 12) hour = 0;
-
     return "$year-$month-$day ${hour.toString().padLeft(2, '0')}:$minute:00";
   }
 
+  // ── Build ─────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
+    final hasSelection = _selectedIndexes.isNotEmpty;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Import TSV')),
+      appBar: AppBar(
+        title: hasSelection ? Text('${_selectedIndexes.length} selected') : const Text('Import TSV'),
+        actions: [
+          if (sites.isNotEmpty) ...[
+            TextButton(
+              onPressed: _toggleSelectAll,
+              child: Text(_allSelected ? 'Unselect All' : 'Select All'),
+            ),
+            if (hasSelection)
+              isCreating
+                  ? const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      child: Center(
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                    )
+                  : IconButton(
+                      tooltip: 'Create Sites',
+                      onPressed: _createSites,
+                      icon: const Icon(Icons.cloud_upload_outlined),
+                    ),
+          ],
+        ],
+      ),
       body: Column(
         children: [
           const SizedBox(height: 16),
@@ -207,10 +306,7 @@ class _SiteImportPageState extends State<SiteImportPage> {
           if (error != null)
             Padding(
               padding: const EdgeInsets.all(16),
-              child: Text(
-                error!,
-                style: const TextStyle(color: Colors.red),
-              ),
+              child: Text(error!, style: const TextStyle(color: Colors.red)),
             ),
 
           Expanded(
@@ -218,16 +314,34 @@ class _SiteImportPageState extends State<SiteImportPage> {
               itemCount: sites.length,
               itemBuilder: (context, index) {
                 final site = sites[index];
+                final isSelected = _selectedIndexes.contains(index);
 
                 return ExpansionTile(
+                  leading: Checkbox(
+                    value: isSelected,
+                    onChanged: (_) => _toggleSelect(index),
+                  ),
                   title: Text(site.circuitId),
+                  trailing: IconButton(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => SiteDetailPage(
+                            circuitId: '',
+                            siteDetailModel: site,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.navigate_next_rounded),
+                  ),
                   subtitle: Text(
                     "${site.customerName ?? '-'}\n"
                     "LatLng: ${site.customerLat}, ${site.customerLng}",
                   ),
                   children: [
                     Padding(
-                      padding: EdgeInsetsGeometry.all(8),
+                      padding: const EdgeInsets.all(8),
                       child: Text(site.toJson().toString()),
                     ),
                   ],

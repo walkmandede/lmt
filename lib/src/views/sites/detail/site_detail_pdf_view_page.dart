@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:lmt/core/extensions/string_extension.dart';
 import 'package:lmt/src/models/site_detail_model.dart';
 import 'package:lmt/src/views/sites/detail/pdf_helper.dart';
 import 'package:pdf/pdf.dart';
@@ -123,7 +124,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
             pw.SizedBox(height: 16),
             band('A', 'Circuit ID information'),
             dataRow('1', 'Circuit ID', circuitId),
-            dataRow2('2', 'Location (Coordinates)', 'Lat', s('customerLat'), 'Long', s('customerLng')),
+            dataRow2('2', 'Location (Coordinates)', 'Lat', s('customerLat').formatDecimal(), 'Long', s('customerLng').formatDecimal()),
             dataRow('3', 'Work Order Date/Time', s('workOrderDateTime')),
             dataRow('4', 'Activation/Relocated Date/Time', s('activationDateTime')),
             pw.SizedBox(height: 16),
@@ -131,14 +132,17 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
             dataRow('1', 'Survey Result (Feasible)', s('surveyResultDateTime')),
             dataRow('2', 'FAT Name', s('fatName')),
             dataRow('3', 'FAT Port No', s('fatPortNumber')),
-            dataRow2('4', 'FAT Location (Coordinates)', 'Lat', s('fatLat'), 'Long', s('fatLng')),
+            dataRow2('4', 'FAT Location (Coordinates)', 'Lat', s('fatLat').formatDecimal(), 'Long', s('fatLng').formatDecimal()),
             dataRow2('5', 'Optical Level at FAT port', '1310nm', s('opticalLevelFatPort1310nm'), '1490nm', s('opticalLevelFatPort1490nm')),
             dataRow2('6', 'Optical Level at ATB port', '1310nm', s('opticalLevelAtbPort1310nm'), '1490nm', s('opticalLevelAtbPort1490nm')),
             dataRow('7', 'Drop Cable Length (m)', s('dropCableLengthInMeter')),
             dataRow('8', 'ROW issue', s('rowIssue')),
             pw.SizedBox(height: 16),
             band('C', 'Cable Route Diagram'),
-            if (mapImg != null) pw.Expanded(child: pw.Image(pw.MemoryImage(mapImg))),
+            if (mapImg != null)
+              pw.Expanded(
+                child: pw.Center(child: pw.Image(pw.MemoryImage(mapImg), width: double.infinity)),
+              ),
             pageFooter(3),
           ],
         ),

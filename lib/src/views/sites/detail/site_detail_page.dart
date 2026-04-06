@@ -14,7 +14,13 @@ import 'package:screenshot/screenshot.dart';
 
 class SiteDetailPage extends StatefulWidget {
   final String circuitId;
-  const SiteDetailPage({super.key, required this.circuitId});
+  final SiteDetailModel? siteDetailModel;
+
+  const SiteDetailPage({
+    super.key,
+    required this.circuitId,
+    this.siteDetailModel,
+  });
 
   @override
   State<SiteDetailPage> createState() => _SiteDetailPageState();
@@ -32,8 +38,13 @@ class _SiteDetailPageState extends State<SiteDetailPage> {
   }
 
   Future<void> _load() async {
-    final model = await _service.getSite(widget.circuitId);
-    setState(() => _site = model);
+    if (widget.siteDetailModel != null) {
+      _site = widget.siteDetailModel!.copyWith();
+    } else {
+      final model = await _service.getSite(widget.circuitId);
+      _site = model;
+    }
+    setState(() {});
   }
 
   @override
@@ -45,53 +56,55 @@ class _SiteDetailPageState extends State<SiteDetailPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.circuitId, style: const TextStyle(fontSize: 14, fontFamily: 'monospace')),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.print),
-            onPressed: () async {
-              final mapImg = await _screenshotController.capture();
-              await Future.delayed(const Duration(milliseconds: 200));
-              superPrint(mapImg?.length);
-              if (context.mounted) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) {
-                      return SiteDetailPdfViewPage(
-                        siteDetailModel: _site!,
-                        mapImage: mapImg,
+        actions: widget.siteDetailModel != null
+            ? []
+            : [
+                IconButton(
+                  icon: Icon(Icons.print),
+                  onPressed: () async {
+                    final mapImg = await _screenshotController.capture();
+                    await Future.delayed(const Duration(milliseconds: 200));
+                    superPrint(mapImg?.length);
+                    if (context.mounted) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) {
+                            return SiteDetailPdfViewPage(
+                              siteDetailModel: _site!,
+                              mapImage: mapImg,
+                            );
+                          },
+                        ),
                       );
-                    },
-                  ),
-                );
-              }
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () async {
-              await Navigator.pushNamed(context, '/update', arguments: widget.circuitId);
-              _load();
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.map),
-            onPressed: () async {
-              await Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) {
-                    return SiteMapEditPage(siteDetailModel: _site!);
+                    }
                   },
                 ),
-              );
-              _load();
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete),
-            onPressed: _confirmDelete,
-          ),
-        ],
+                IconButton(
+                  icon: const Icon(Icons.edit),
+                  onPressed: () async {
+                    await Navigator.pushNamed(context, '/update', arguments: widget.circuitId);
+                    _load();
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.map),
+                  onPressed: () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) {
+                          return SiteMapEditPage(siteDetailModel: _site!);
+                        },
+                      ),
+                    );
+                    _load();
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete),
+                  onPressed: _confirmDelete,
+                ),
+              ],
       ),
       body: RefreshIndicator(
         onRefresh: _load,
@@ -116,441 +129,533 @@ class _SiteDetailPageState extends State<SiteDetailPage> {
   Widget _mapSection(BuildContext context, SiteDetailModel site) {
     final poles = site.poles ?? [];
     final size = MediaQuery.of(context).size;
-    return SizedBox(
-      width: size.aspectRatio > 1 ? min(200, size.width) : size.width,
-      height: size.aspectRatio > 1 ? min(400, (size.width / 2)) : size.width,
-
-      child: Screenshot(
-        controller: _screenshotController,
-        child: LayoutBuilder(
-          builder: (a1, c1) {
-            return Column(
-              children: [
-                Expanded(
-                  child: FlutterMap(
-                    options: MapOptions(
-                      initialCameraFit: !site.hasLocations
-                          ? null
-                          : CameraFit.bounds(bounds: LatLngBounds(site.fatLatLng!, site.customerLatLng!), padding: EdgeInsets.all(32)),
-                    ),
-                    children: [
-                      TileLayer(
-                        urlTemplate: 'https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png',
-                        userAgentPackageName: 'LMT',
-                      ),
-                      PolylineLayer(
-                        polylines: [
-                          if (site.canDrawPolyLine)
-                            Polyline(
-                              color: Colors.blue,
-                              pattern: StrokePattern.solid(),
-                              strokeWidth: 2,
-                              points: [
-                                if (site.customerLatLng != null) site.customerLatLng!,
-                                ...(poles.where((e) => e.hasLocations)).map((p) {
-                                  return LatLng(p.lat!, p.lng!);
-                                }),
-                                if (site.fatLat != null) site.fatLatLng!,
-                              ],
-                            ),
-                        ],
-                      ),
-                      MarkerLayer(
-                        markers: [
-                          if (site.customerLatLng != null)
-                            Marker(
-                              width: 25,
-                              height: 25,
-                              point: site.customerLatLng!,
-                              alignment: Alignment.topCenter,
-                              child: SizedBox(
-                                width: 25,
-                                height: 25,
-                                child: Card(
-                                  margin: EdgeInsets.zero,
-                                  elevation: 0,
-                                  shape: CircleBorder(),
-                                  color: Colors.green,
-                                  child: Icon(
-                                    Icons.home,
-                                    color: Colors.white,
-                                    size: 16,
-                                  ),
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Center(
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: Colors.black,
+            ),
+          ),
+          width: size.height * 0.6,
+          height: size.height * 0.5,
+          child: Screenshot(
+            controller: _screenshotController,
+            child: LayoutBuilder(
+              builder: (a1, c1) {
+                return Column(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: FlutterMap(
+                        options: MapOptions(
+                          initialCameraFit: !site.hasLocations
+                              ? null
+                              : CameraFit.bounds(bounds: LatLngBounds(site.fatLatLng!, site.customerLatLng!), padding: EdgeInsets.all(32)),
+                        ),
+                        children: [
+                          TileLayer(
+                            urlTemplate: 'https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png',
+                            userAgentPackageName: 'LMT',
+                          ),
+                          PolylineLayer(
+                            polylines: [
+                              if (site.canDrawPolyLine)
+                                Polyline(
+                                  color: Colors.blue,
+                                  pattern: StrokePattern.solid(),
+                                  strokeWidth: 2,
+                                  points: [
+                                    if (site.customerLatLng != null) site.customerLatLng!,
+                                    ...(poles.where((e) => e.hasLocations)).map((p) {
+                                      return LatLng(p.lat!, p.lng!);
+                                    }),
+                                    if (site.fatLat != null) site.fatLatLng!,
+                                  ],
                                 ),
-                              ),
-                            ),
-                          if (site.fatLatLng != null)
-                            Marker(
-                              width: 30,
-                              height: 30,
-                              point: site.fatLatLng!,
-                              alignment: Alignment.topCenter,
-                              child: Icon(
-                                Icons.location_on_rounded,
-                                color: Colors.green,
-                                size: 30,
-                              ),
-                            ),
-                          ...(site.poles ?? []).map((p) {
-                            Color color = Colors.black;
-                            if (p.enumPoleType != null) {
-                              switch (p.enumPoleType) {
-                                case null:
-                                  color = Colors.black;
-                                case EnumPoleType.epc:
-                                  color = Colors.red;
-                                case EnumPoleType.mpt:
-                                  color = Colors.green;
-                                case EnumPoleType.other:
-                                  color = Colors.blue;
-                              }
-                            }
-                            return Marker(
-                              width: 25,
-                              height: 25,
-                              point: LatLng(p.lat ?? 0, p.lng ?? 0),
-                              alignment: Alignment.center,
-                              child: Card(
-                                elevation: 0,
-                                shape: CircleBorder(),
-                                color: color,
-                                child: Center(
-                                  child: Container(
-                                    height: 3,
-                                    width: 35,
-                                    color: Colors.black,
-                                  ),
-                                ),
-                              ),
-                            );
-                          }),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                Align(
-                  alignment: AlignmentGeometry.bottomLeft,
-                  child: SizedBox(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Expanded(
-                          flex: 3,
-                          child: Table(
-                            border: TableBorder.all(color: Colors.black.withAlpha((0.6 * 255).toInt())),
-                            columnWidths: {
-                              0: FlexColumnWidth(1),
-                              1: FlexColumnWidth(3),
-                              2: FlexColumnWidth(4),
-                              3: FlexColumnWidth(2),
-                              4: FlexColumnWidth(3),
-                            },
-                            children: [
-                              TableRow(
-                                decoration: BoxDecoration(color: Colors.lightBlue.withAlpha((0.9 * 255).toInt())),
-                                children: [
-                                  Center(
-                                    child: Text(
-                                      'No',
-                                      style: TextStyle(color: Colors.black),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Text(
-                                      'Outline',
-                                      style: TextStyle(color: Colors.black),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: FittedBox(
-                                      child: Text(
-                                        'Description',
-                                        style: TextStyle(color: Colors.black),
-                                      ),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Text(
-                                      'Unit',
-                                      style: TextStyle(color: Colors.black),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Text(
-                                      'Qty',
-                                      style: TextStyle(color: Colors.black),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              TableRow(
-                                decoration: BoxDecoration(color: Colors.white.withAlpha((0.9 * 255).toInt())),
-                                children: [
-                                  Center(
-                                    child: Text('1'),
-                                  ),
-                                  Center(
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 6),
-                                      child: Container(
-                                        height: 2,
-                                        width: 20,
-                                        decoration: BoxDecoration(color: Colors.blue),
-                                      ),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Padding(
-                                      padding: EdgeInsets.symmetric(horizontal: 4),
-                                      child: Text(
-                                        'Drop Cable Length',
-                                        style: TextStyle(color: Colors.black, fontSize: 12),
-                                      ),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Text(
-                                      'Meter',
-                                      style: TextStyle(color: Colors.black),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Text(
-                                      '150m',
-                                      style: TextStyle(color: Colors.black),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              TableRow(
-                                decoration: BoxDecoration(color: Colors.white.withAlpha((0.9 * 255).toInt())),
-                                children: [
-                                  Center(
-                                    child: Text('2'),
-                                  ),
-                                  Center(
-                                    child: SizedBox(
-                                      width: 25,
-                                      height: 25,
-                                      child: Card(
-                                        elevation: 0,
-                                        shape: CircleBorder(),
-                                        color: Colors.blue,
-                                        child: Center(
-                                          child: Container(
-                                            height: 3,
-                                            width: 35,
-                                            color: Colors.black,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Padding(
-                                      padding: EdgeInsets.symmetric(horizontal: 4),
-                                      child: Text(
-                                        'Other Pole',
-                                        style: TextStyle(color: Colors.black),
-                                      ),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Text(
-                                      'Pcs',
-                                      style: TextStyle(color: Colors.black),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Text(
-                                      poles.where((p) => p.enumPoleType == EnumPoleType.other).length.toString(),
-                                      style: TextStyle(color: Colors.black),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              TableRow(
-                                decoration: BoxDecoration(color: Colors.white.withAlpha((0.9 * 255).toInt())),
-                                children: [
-                                  Center(
-                                    child: Text('3'),
-                                  ),
-                                  Center(
-                                    child: SizedBox(
-                                      width: 25,
-                                      height: 25,
-                                      child: Card(
-                                        elevation: 0,
-                                        shape: CircleBorder(),
-                                        color: Colors.red,
-                                        child: Center(
-                                          child: Container(
-                                            height: 3,
-                                            width: 35,
-                                            color: Colors.black,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Padding(
-                                      padding: EdgeInsets.symmetric(horizontal: 4),
-                                      child: Text(
-                                        'EPC Pole',
-                                        style: TextStyle(color: Colors.black),
-                                      ),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Text(
-                                      'Pcs',
-                                      style: TextStyle(color: Colors.black),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Text(
-                                      poles.where((p) => p.enumPoleType == EnumPoleType.epc).length.toString(),
-                                      style: TextStyle(color: Colors.black),
-                                    ),
-                                  ),
-                                ],
-                              ),
-
-                              TableRow(
-                                decoration: BoxDecoration(color: Colors.white.withAlpha((0.9 * 255).toInt())),
-                                children: [
-                                  Center(
-                                    child: Text('4'),
-                                  ),
-                                  Center(
-                                    child: SizedBox(
-                                      width: 25,
-                                      height: 25,
-                                      child: Card(
-                                        elevation: 0,
-                                        shape: CircleBorder(),
-                                        color: Colors.green,
-                                        child: Center(
-                                          child: Container(
-                                            height: 3,
-                                            width: 35,
-                                            color: Colors.black,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Padding(
-                                      padding: EdgeInsets.symmetric(horizontal: 4),
-                                      child: Text(
-                                        'MPT Pole',
-                                        style: TextStyle(color: Colors.black),
-                                      ),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Text(
-                                      'Pcs',
-                                      style: TextStyle(color: Colors.black),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Text(
-                                      poles.where((p) => p.enumPoleType == EnumPoleType.mpt).length.toString(),
-                                      style: TextStyle(color: Colors.black),
-                                    ),
-                                  ),
-                                ],
-                              ),
                             ],
                           ),
-                        ),
-                        Expanded(
-                          flex: 1,
-                          child: Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Column(
-                              spacing: 8,
-                              children: [
-                                Container(
-                                  width: double.infinity,
-                                  decoration: BoxDecoration(
-                                    border: Border.all(color: Colors.black),
-                                  ),
-                                  child: Padding(
-                                    padding: EdgeInsets.all(8),
-                                    child: Column(
-                                      children: [
-                                        Text(
-                                          'N: ${_site?.customerLat.toString().substring(0, min((_site?.customerLat ?? '-').toString().length, 7)) ?? '-'}',
-                                          style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold),
-                                        ),
-                                        Text(
-                                          'E: ${_site?.customerLng.toString().substring(0, min((_site?.customerLng ?? '-').toString().length, 7)) ?? '-'}',
-                                          style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold),
-                                        ),
-                                        FittedBox(
-                                          child: Text(
-                                            _site?.circuitId ?? '-',
-                                            style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold),
+
+                          MarkerLayer(
+                            markers: [
+                              //cus pin
+                              if (site.customerLatLng != null)
+                                Marker(
+                                  width: 50,
+                                  height: 30,
+                                  point: site.customerLatLng!,
+                                  alignment: Alignment.topCenter,
+                                  child: Column(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          site.circuitId,
+                                          style: TextStyle(
+                                            fontSize: 5,
+                                            foreground: Paint()
+                                              ..style = PaintingStyle.stroke
+                                              ..strokeWidth = 0.8
+                                              ..color = Colors.black,
                                           ),
                                         ),
-                                      ],
+                                      ),
+                                      SizedBox(
+                                        width: 15,
+                                        height: 15,
+                                        child: Card(
+                                          margin: EdgeInsets.zero,
+                                          elevation: 0,
+                                          shape: CircleBorder(),
+                                          color: Colors.green,
+                                          child: Icon(
+                                            Icons.home,
+                                            color: Colors.white,
+                                            size: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              //cus info
+                              if (site.customerLatLng != null)
+                                Marker(
+                                  width: 80,
+                                  height: 40,
+                                  point: site.customerLatLng!,
+                                  alignment: Alignment.bottomCenter,
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      border: Border.all(),
+                                      color: Colors.white.withAlpha((0.7 * 255).toInt()),
+                                    ),
+                                    child: SizedBox.expand(
+                                      child: LayoutBuilder(
+                                        builder: (a1, c1) {
+                                          return Padding(
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: c1.maxWidth * 0.05,
+                                              vertical: c1.maxHeight * 0.05,
+                                            ),
+                                            child: Column(
+                                              children: [
+                                                Expanded(
+                                                  child: FittedBox(child: Text('N: ${_site?.customerLatLabel ?? '-'}')),
+                                                ),
+                                                Expanded(
+                                                  child: FittedBox(child: Text('E: ${_site?.customerLngLabel ?? '-'}')),
+                                                ),
+                                                Expanded(
+                                                  child: FittedBox(
+                                                    alignment: Alignment.center,
+                                                    child: Text(_site?.circuitId ?? ''),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        },
+                                      ),
                                     ),
                                   ),
                                 ),
-                                Container(
-                                  width: double.infinity,
-                                  decoration: BoxDecoration(
-                                    border: Border.all(color: Colors.black),
+                              //fatPin
+                              if (site.fatLatLng != null)
+                                Marker(
+                                  width: 50,
+                                  height: 30,
+                                  point: site.fatLatLng!,
+                                  alignment: Alignment.topCenter,
+                                  child: Column(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          site.fatName ?? '-',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            foreground: Paint()
+                                              ..style = PaintingStyle.stroke
+                                              ..strokeWidth = 0.8
+                                              ..color = Colors.black,
+                                          ),
+                                        ),
+                                      ),
+                                      SizedBox(
+                                        width: 15,
+                                        height: 15,
+                                        child: Icon(
+                                          Icons.location_on_rounded,
+                                          color: Colors.green,
+                                          size: 12,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  child: Padding(
-                                    padding: EdgeInsets.all(8),
-                                    child: Column(
-                                      children: [
-                                        Text(
-                                          'N: ${_site?.fatLat.toString().substring(0, min((_site?.fatLat ?? '-').toString().length, 7)) ?? '-'}',
-                                          style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold),
-                                        ),
-                                        Text(
-                                          'E: ${_site?.fatLng.toString().substring(0, min((_site?.fatLng ?? '-').toString().length, 7)) ?? '-'}',
-                                          style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold),
-                                        ),
-                                        Text(
-                                          _site?.fatName ?? '-',
-                                          style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold),
-                                        ),
-                                      ],
+                                ),
+                              //fat info
+                              if (site.fatLatLng != null)
+                                Marker(
+                                  width: 80,
+                                  height: 40,
+                                  point: site.fatLatLng!,
+                                  alignment: Alignment.bottomCenter,
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      border: Border.all(),
+                                      color: Colors.white.withAlpha((0.7 * 255).toInt()),
+                                    ),
+                                    child: SizedBox.expand(
+                                      child: LayoutBuilder(
+                                        builder: (a1, c1) {
+                                          return Padding(
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: c1.maxWidth * 0.05,
+                                              vertical: c1.maxHeight * 0.05,
+                                            ),
+                                            child: Column(
+                                              children: [
+                                                Expanded(
+                                                  child: FittedBox(
+                                                    alignment: Alignment.center,
+                                                    child: Text('Lat: ${_site?.fatLatLabel ?? '-'}'),
+                                                  ),
+                                                ),
+                                                Expanded(
+                                                  child: FittedBox(
+                                                    alignment: Alignment.center,
+                                                    child: Text('Lat: ${_site?.fatLngLabel ?? '-'}'),
+                                                  ),
+                                                ),
+                                                Expanded(
+                                                  child: FittedBox(
+                                                    alignment: Alignment.center,
+                                                    child: Text(_site?.fatName ?? ''),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        },
+                                      ),
                                     ),
                                   ),
                                 ),
-                                Container(
-                                  width: double.infinity,
-                                  decoration: BoxDecoration(
-                                    border: Border.all(color: Colors.black),
+                              //cable marker
+                              Marker(
+                                width: 50,
+                                height: 35,
+                                point: site.hasPole
+                                    ? LatLng(poles.first.lat ?? 0, poles.first.lng ?? 0)
+                                    : AppFunctions.getMidPointSimple(
+                                        site.customerLatLng ?? LatLng(0, 0),
+                                        site.fatLatLng ?? LatLng(0, 0),
+                                      ),
+                                alignment: Alignment.bottomCenter,
+                                child: Padding(
+                                  padding: EdgeInsets.only(
+                                    top: 15,
                                   ),
-                                  child: Padding(
-                                    padding: EdgeInsets.all(8),
-                                    child: Text(
-                                      _site?.lspName ?? '-',
-                                      style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold),
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withAlpha((0.7 * 255).toInt()),
+                                    ),
+                                    child: SizedBox.expand(
+                                      child: LayoutBuilder(
+                                        builder: (a1, c1) {
+                                          return Center(
+                                            child: Text('${site.dropCableLengthInMeter ?? 0}'),
+                                          );
+                                        },
+                                      ),
                                     ),
                                   ),
+                                ),
+                              ),
+
+                              ...(site.poles ?? []).map((p) {
+                                Color color = Colors.black;
+                                if (p.enumPoleType != null) {
+                                  switch (p.enumPoleType) {
+                                    case null:
+                                      color = Colors.black;
+                                    case EnumPoleType.epc:
+                                      color = Colors.red;
+                                    case EnumPoleType.mpt:
+                                      color = Colors.green;
+                                    case EnumPoleType.other:
+                                      color = Colors.blue;
+                                  }
+                                }
+                                return Marker(
+                                  width: 25,
+                                  height: 25,
+                                  point: LatLng(p.lat ?? 0, p.lng ?? 0),
+                                  alignment: Alignment.center,
+                                  child: Card(
+                                    elevation: 0,
+                                    shape: CircleBorder(),
+                                    color: color,
+                                    child: Center(
+                                      child: Container(
+                                        height: 3,
+                                        width: 35,
+                                        color: Colors.black,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: Table(
+                              border: TableBorder.all(color: Colors.black.withAlpha((0.6 * 255).toInt())),
+                              columnWidths: {
+                                0: FlexColumnWidth(1),
+                                1: FlexColumnWidth(3),
+                                2: FlexColumnWidth(4),
+                                3: FlexColumnWidth(2),
+                                4: FlexColumnWidth(3),
+                              },
+                              children: [
+                                TableRow(
+                                  decoration: BoxDecoration(color: Colors.lightBlue.withAlpha((0.9 * 255).toInt())),
+                                  children: [
+                                    Center(
+                                      child: Text(
+                                        'No',
+                                        style: TextStyle(color: Colors.black),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Text(
+                                        'Outline',
+                                        style: TextStyle(color: Colors.black),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: FittedBox(
+                                        child: Text(
+                                          'Description',
+                                          style: TextStyle(color: Colors.black),
+                                        ),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Text(
+                                        'Unit',
+                                        style: TextStyle(color: Colors.black),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Text(
+                                        'Qty',
+                                        style: TextStyle(color: Colors.black),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                TableRow(
+                                  decoration: BoxDecoration(color: Colors.white.withAlpha((0.9 * 255).toInt())),
+                                  children: [
+                                    Center(
+                                      child: Text('1'),
+                                    ),
+                                    Center(
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 8),
+                                        child: Container(
+                                          height: 2,
+                                          width: 20,
+                                          decoration: BoxDecoration(color: Colors.blue),
+                                        ),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Padding(
+                                        padding: EdgeInsets.symmetric(horizontal: 4),
+                                        child: Text(
+                                          'Drop Cable Length',
+                                          style: TextStyle(color: Colors.black, fontSize: 12),
+                                        ),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Text(
+                                        'Meter',
+                                        style: TextStyle(color: Colors.black),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Text(
+                                        _site?.dropCableLengthInMeter ?? '-',
+                                        style: TextStyle(color: Colors.black),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                TableRow(
+                                  decoration: BoxDecoration(color: Colors.white.withAlpha((0.9 * 255).toInt())),
+                                  children: [
+                                    Center(
+                                      child: Text('2'),
+                                    ),
+                                    Center(
+                                      child: SizedBox(
+                                        width: 25,
+                                        height: 25,
+                                        child: Card(
+                                          elevation: 0,
+                                          shape: CircleBorder(),
+                                          color: Colors.blue,
+                                          child: Center(
+                                            child: Container(
+                                              height: 3,
+                                              width: 35,
+                                              color: Colors.black,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Padding(
+                                        padding: EdgeInsets.symmetric(horizontal: 4),
+                                        child: Text(
+                                          'Other Pole',
+                                          style: TextStyle(color: Colors.black),
+                                        ),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Text(
+                                        'Pcs',
+                                        style: TextStyle(color: Colors.black),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Text(
+                                        poles.where((p) => p.enumPoleType == EnumPoleType.other).length.toString(),
+                                        style: TextStyle(color: Colors.black),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                TableRow(
+                                  decoration: BoxDecoration(color: Colors.white.withAlpha((0.9 * 255).toInt())),
+                                  children: [
+                                    Center(
+                                      child: Text('3'),
+                                    ),
+                                    Center(
+                                      child: SizedBox(
+                                        width: 25,
+                                        height: 25,
+                                        child: Card(
+                                          elevation: 0,
+                                          shape: CircleBorder(),
+                                          color: Colors.red,
+                                          child: Center(
+                                            child: Container(
+                                              height: 3,
+                                              width: 35,
+                                              color: Colors.black,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Padding(
+                                        padding: EdgeInsets.symmetric(horizontal: 4),
+                                        child: Text(
+                                          'EPC Pole',
+                                          style: TextStyle(color: Colors.black),
+                                        ),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Text(
+                                        'Pcs',
+                                        style: TextStyle(color: Colors.black),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Text(
+                                        poles.where((p) => p.enumPoleType == EnumPoleType.epc).length.toString(),
+                                        style: TextStyle(color: Colors.black),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+
+                                TableRow(
+                                  decoration: BoxDecoration(color: Colors.white.withAlpha((0.9 * 255).toInt())),
+                                  children: [
+                                    Center(
+                                      child: Text('4'),
+                                    ),
+                                    Center(
+                                      child: SizedBox(
+                                        width: 25,
+                                        height: 25,
+                                        child: Card(
+                                          elevation: 0,
+                                          shape: CircleBorder(),
+                                          color: Colors.green,
+                                          child: Center(
+                                            child: Container(
+                                              height: 3,
+                                              width: 35,
+                                              color: Colors.black,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Padding(
+                                        padding: EdgeInsets.symmetric(horizontal: 4),
+                                        child: Text(
+                                          'MPT Pole',
+                                          style: TextStyle(color: Colors.black),
+                                        ),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Text(
+                                        'Pcs',
+                                        style: TextStyle(color: Colors.black),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Text(
+                                        poles.where((p) => p.enumPoleType == EnumPoleType.mpt).length.toString(),
+                                        style: TextStyle(color: Colors.black),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ),
-              ],
-            );
-          },
+                  ],
+                );
+              },
+            ),
+          ),
         ),
       ),
     );

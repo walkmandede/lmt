@@ -273,6 +273,8 @@ class SiteDetailModel {
 
   bool get hasLocations => fatLatLng != null && customerLatLng != null;
 
+  bool get hasPole => (poles ?? []).isNotEmpty;
+
   bool get canDrawPolyLine {
     int count = 0;
     if (customerLatLng != null) count++;
@@ -284,6 +286,19 @@ class SiteDetailModel {
 
     return count > 1;
   }
+
+  String? _formatCoord(double? value) {
+    if (value == null) return null;
+    return value.toStringAsFixed(6);
+  }
+
+  // Customer
+  String? get customerLatLabel => _formatCoord(customerLat);
+  String? get customerLngLabel => _formatCoord(customerLng);
+
+  // FAT
+  String? get fatLatLabel => _formatCoord(fatLat);
+  String? get fatLngLabel => _formatCoord(fatLng);
 
   factory SiteDetailModel.fromJson(Map<String, dynamic> json) {
     return SiteDetailModel(circuitId: json['circuit_id'])

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:latlong2/latlong.dart';
 
 void superPrint(var content, {var title = 'Super Print'}) {
   String callerFrame = '';
@@ -46,4 +47,11 @@ void vibrateNow() {
   } catch (_) {}
 }
 
-class AppFunctions {}
+class AppFunctions {
+  static LatLng getMidPointSimple(LatLng a, LatLng b) {
+    return LatLng(
+      (a.latitude + b.latitude) / 2,
+      (a.longitude + b.longitude) / 2,
+    );
+  }
+}

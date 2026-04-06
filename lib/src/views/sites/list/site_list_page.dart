@@ -103,7 +103,7 @@ class _SiteListPageState extends State<SiteListPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('FTTH Sites'),
+        title: const Text('FTTH Sites - v(1.0.2)'),
         actions: [
           TextButton(
             onPressed: () async {
