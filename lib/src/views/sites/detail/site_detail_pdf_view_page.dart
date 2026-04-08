@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:lmt/core/constants/app_functions.dart';
 import 'package:lmt/core/extensions/string_extension.dart';
 import 'package:lmt/src/models/site_detail_model.dart';
 import 'package:lmt/src/views/sites/detail/pdf_helper.dart';
@@ -17,23 +18,23 @@ PdfColor pdfColorBlue1 = PdfColor.fromHex('#90abdd');
 PdfColor pdfColorBlue2 = PdfColor.fromHex('#dae3f3');
 PdfColor pdfColorGrey1 = PdfColor.fromHex('#d9d9d9');
 
-Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
+Future<Uint8List> _buildPdf(Map<String, dynamic> params) async {
   final doc = pw.Document(title: 'Site Detail Report', author: 'Galaxia Net');
 
-  final mpt = p['imgMpt'] as Uint8List;
-  final ksgm = p['imgKsgm'] as Uint8List;
-  final mapImg = p['mapImage'] as Uint8List?;
-  final circuitId = p['circuitId'] as String;
-  final d4Bytes = (p['d4'] as List<dynamic>).cast<Uint8List>();
+  final mpt = params['imgMpt'] as Uint8List;
+  final ksgm = params['imgKsgm'] as Uint8List;
+  final mapImg = params['mapImage'] as Uint8List?;
+  final circuitId = params['circuitId'] as String;
+  final d4Bytes = (params['d4'] as List<dynamic>).cast<Uint8List>();
 
-  final poles = (p['poles'] as List<dynamic>).cast<Map<String, dynamic>>();
+  final poles = (params['poles'] as List<dynamic>).cast<Map<String, dynamic>>();
 
   pw.ImageProvider? img(String key) {
-    final b = p[key] as Uint8List?;
+    final b = params[key] as Uint8List?;
     return b == null ? null : pw.MemoryImage(b);
   }
 
-  String s(String key) => (p[key] as String?) ?? '-';
+  String s(String key) => (params[key] as String?) ?? '-';
 
   // ── Page 1: Cover ─────────────────────────────────────────────────────────
   doc.addPage(
@@ -1276,7 +1277,6 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
             (index) => null,
           ),
         ];
-
         return [
           pw.Container(
             width: double.infinity,
@@ -1321,7 +1321,6 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                   flex: 3,
                   child: pw.Container(
                     width: double.infinity,
-
                     alignment: pw.Alignment.centerLeft,
                     child: pw.Padding(
                       padding: pw.EdgeInsets.all(8),
@@ -1395,7 +1394,6 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                   flex: 3,
                   child: pw.Container(
                     width: double.infinity,
-
                     alignment: pw.Alignment.centerLeft,
                     child: pw.Padding(
                       padding: pw.EdgeInsets.all(8),
@@ -1438,7 +1436,6 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
               ],
             ),
           ),
-
           pw.GridView(
             crossAxisCount: 2,
             childAspectRatio: 6 / 5,
@@ -1623,7 +1620,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
       },
     ),
   );
-
+  superPrint('pdf has been saved');
   return await doc.save();
 }
 
@@ -1694,21 +1691,45 @@ class _SiteDetailPdfViewPageState extends State<SiteDetailPdfViewPage> {
     final imgMptData = await rootBundle.load('assets/mptlogo.jpg');
     final imgKsgmData = await rootBundle.load('assets/ksgm.jpg');
 
-    // 2. All named network images in parallel with per-image progress updates.
+    // 2. Named network images — one at a time.
     final entries = _imageEntries;
+    final namedResults = <(String, Uint8List?)>[];
+    for (final e in entries) {
+      final bytes = await fetchBytes(e.$2);
+      setState(() {
+        _progress += 1;
+      });
+      namedResults.add((e.$1, bytes));
+    }
 
-    final namedResults = await Future.wait(
-      entries.map((e) async {
-        final bytes = await fetchBytes(e.$2);
-        return (e.$1, bytes);
-      }),
-    );
-
-    // 3. d4 list (variable length).
+    // 3. d4 list — one at a time.
     final d4Urls = _sd.gallery?.d4 ?? [];
-    final d4Bytes = await Future.wait(d4Urls.map(fetchBytes));
+    final d4Bytes = <Uint8List?>[];
+    for (final url in d4Urls) {
+      setState(() {
+        _progress += 1;
+      });
+      d4Bytes.add(await fetchBytes(url));
+    }
 
-    // 4. Assemble the params map for compute(). //majorParams
+    // 4. Poles — one at a time.
+    final poleParams = <Map<String, dynamic>>[];
+    for (final pole in (_sd.poles ?? [])) {
+      superPrint(pole);
+      final imageBytes = await fetchBytes(pole.image);
+      setState(() {
+        _progress += 1;
+      });
+      poleParams.add({
+        'poleId': pole.id ?? '-',
+        'poleType': pole ?? '-',
+        'lat': pole.lat ?? 0,
+        'lng': pole.lng ?? 0,
+        'imageBytes': imageBytes,
+      });
+    }
+
+    // 5. Assemble the params map for compute().
     final params = <String, dynamic>{
       'imgMpt': imgMptData.buffer.asUint8List(),
       'imgKsgm': imgKsgmData.buffer.asUint8List(),
@@ -1734,22 +1755,10 @@ class _SiteDetailPdfViewPageState extends State<SiteDetailPdfViewPage> {
       'rowIssue': _sd.rowIssue,
       'ontSerialNumber': _sd.ontSnNumber ?? '-',
       'lspName': _sd.lspName ?? '-',
-
       // d4
       'd4': d4Bytes.whereType<Uint8List>().toList(),
-      //poles
-      'poles': await Future.wait(
-        (_sd.poles ?? []).map((pole) async {
-          final imageBytes = await fetchBytes(pole.image);
-          return {
-            'poleId': pole.id ?? '-',
-            'poleType': pole.enumPoleType?.name ?? '-',
-            'lat': pole.lat ?? 0,
-            'lng': pole.lng ?? 0,
-            'imageBytes': imageBytes, // Uint8List? — safe to pass to compute()
-          };
-        }),
-      ),
+      // poles
+      'poles': poleParams,
     };
 
     // Add all named image bytes.
@@ -1757,10 +1766,11 @@ class _SiteDetailPdfViewPageState extends State<SiteDetailPdfViewPage> {
       params[r.$1] = r.$2;
     }
 
-    // 5. Build + encode PDF in a background isolate.
+    // 6. Build + encode PDF in a background isolate.
     await Future.delayed(const Duration(milliseconds: 500));
 
-    final pdfBytes = await compute(_buildPdf, params);
+    // final pdfBytes = await compute(_buildPdf, params);
+    final pdfBytes = await _buildPdf(params);
 
     await Future.delayed(const Duration(milliseconds: 250));
 
@@ -1788,21 +1798,17 @@ class _SiteDetailPdfViewPageState extends State<SiteDetailPdfViewPage> {
       body: SizedBox.expand(
         child: _isLoading
             ? _loadingView()
-            : Column(
-                children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Center(
-                          child: AspectRatio(
-                            aspectRatio: 7 / 10,
-                            child: _pdfView(),
-                          ),
-                        ),
-                      ],
+            : SizedBox(
+                height: double.infinity,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: min(500, ((MediaQuery.of(context).size.width) * 0.9))),
+                      child: _pdfView(),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
       ),
     );
@@ -1823,7 +1829,7 @@ class _SiteDetailPdfViewPageState extends State<SiteDetailPdfViewPage> {
           Text(_progressLabel, style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: 4),
           Text(
-            '${(_progress * 100).toStringAsFixed(0)}%',
+            '${(_progress).toStringAsFixed(0)}/25 images',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
         ],

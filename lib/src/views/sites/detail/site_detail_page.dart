@@ -10,6 +10,7 @@ import 'package:lmt/src/views/_widgets/image_viewer_page.dart';
 import 'package:lmt/src/views/_widgets/section_card.dart';
 import 'package:lmt/src/views/sites/detail/site_detail_pdf_view_page.dart';
 import 'package:lmt/src/views/sites/detail/site_map_edit_page.dart';
+import 'package:lmt/src/views/sites/export/site_pdf_page.dart';
 import 'package:screenshot/screenshot.dart';
 
 class SiteDetailPage extends StatefulWidget {
@@ -73,6 +74,27 @@ class _SiteDetailPageState extends State<SiteDetailPage> {
                             return SiteDetailPdfViewPage(
                               siteDetailModel: _site!,
                               mapImage: mapImg,
+                            );
+                          },
+                        ),
+                      );
+                    }
+                  },
+                ),
+                IconButton(
+                  icon: Icon(Icons.picture_as_pdf),
+                  onPressed: () async {
+                    final mapImg = await _screenshotController.capture();
+                    await Future.delayed(const Duration(milliseconds: 200));
+                    superPrint(mapImg?.length);
+                    if (context.mounted) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) {
+                            return SitePdfPage(
+                              siteDetailModel: _site!,
+                              mapImage: mapImg!,
                             );
                           },
                         ),
