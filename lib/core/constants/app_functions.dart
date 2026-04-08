@@ -1,9 +1,30 @@
+import 'dart:async';
 import 'dart:convert';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:latlong2/latlong.dart';
+import 'dart:js_interop';
+
+@JS('getPastedImageData')
+external JSPromise<JSAny?> _getPastedImageData();
+
+Future<Uint8List?> readClipboardImage() async {
+  try {
+    final result = await _getPastedImageData().toDart;
+    if (result == null) return null;
+
+    final base64String = (result as JSString).toDart;
+    // base64String = "data:image/png;base64,xxxx..."
+    final comma = base64String.indexOf(',');
+    if (comma == -1) return null;
+
+    return base64Decode(base64String.substring(comma + 1));
+  } catch (e) {
+    debugPrint('Paste error: $e');
+    return null;
+  }
+}
 
 void superPrint(var content, {var title = 'Super Print'}) {
   String callerFrame = '';

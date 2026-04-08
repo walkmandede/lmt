@@ -28,11 +28,33 @@ class AppAssets {
   static const String psi4 = 'assets/images/psi4.jpeg';
   static const String psi5 = 'assets/images/psi5.jpeg';
 }
+import 'dart:async';
 import 'dart:convert';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:latlong2/latlong.dart';
+import 'dart:js_interop';
+
+@JS('getPastedImageData')
+external JSPromise<JSAny?> _getPastedImageData();
+
+Future<Uint8List?> readClipboardImage() async {
+  try {
+    final result = await _getPastedImageData().toDart;
+    if (result == null) return null;
+
+    final base64String = (result as JSString).toDart;
+    // base64String = "data:image/png;base64,xxxx..."
+    final comma = base64String.indexOf(',');
+    if (comma == -1) return null;
+
+    return base64Decode(base64String.substring(comma + 1));
+  } catch (e) {
+    debugPrint('Paste error: $e');
+    return null;
+  }
+}
 
 void superPrint(var content, {var title = 'Super Print'}) {
   String callerFrame = '';
@@ -76,7 +98,14 @@ void vibrateNow() {
   } catch (_) {}
 }
 
-class AppFunctions {}
+class AppFunctions {
+  static LatLng getMidPointSimple(LatLng a, LatLng b) {
+    return LatLng(
+      (a.latitude + b.latitude) / 2,
+      (a.longitude + b.longitude) / 2,
+    );
+  }
+}
 class AppSvgs {
   static const google =
       """<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <path d="M30.0014 16.3109C30.0014 15.1598 29.9061 14.3198 29.6998 13.4487H16.2871V18.6442H24.1601C24.0014 19.9354 23.1442 21.8798 21.2394 23.1864L21.2127 23.3604L25.4536 26.58L25.7474 26.6087C28.4458 24.1665 30.0014 20.5731 30.0014 16.3109Z" fill="#4285F4"></path> <path d="M16.2863 29.9998C20.1434 29.9998 23.3814 28.7553 25.7466 26.6086L21.2386 23.1863C20.0323 24.0108 18.4132 24.5863 16.2863 24.5863C12.5086 24.5863 9.30225 22.1441 8.15929 18.7686L7.99176 18.7825L3.58208 22.127L3.52441 22.2841C5.87359 26.8574 10.699 29.9998 16.2863 29.9998Z" fill="#34A853"></path> <path d="M8.15964 18.769C7.85806 17.8979 7.68352 16.9645 7.68352 16.0001C7.68352 15.0356 7.85806 14.1023 8.14377 13.2312L8.13578 13.0456L3.67083 9.64746L3.52475 9.71556C2.55654 11.6134 2.00098 13.7445 2.00098 16.0001C2.00098 18.2556 2.55654 20.3867 3.52475 22.2845L8.15964 18.769Z" fill="#FBBC05"></path> <path d="M16.2864 7.4133C18.9689 7.4133 20.7784 8.54885 21.8102 9.4978L25.8419 5.64C23.3658 3.38445 20.1435 2 16.2864 2C10.699 2 5.8736 5.1422 3.52441 9.71549L8.14345 13.2311C9.30229 9.85555 12.5086 7.4133 16.2864 7.4133Z" fill="#EB4335"></path> </g></svg>""";
@@ -241,6 +270,16 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SupabaseClientProvider {
   static SupabaseClient get client => Supabase.instance.client;
+}
+extension DecimalFormatter on String? {
+  String formatDecimal({int fractionDigits = 6, String defaultValue = '-'}) {
+    if (this == null || this!.trim().isEmpty) return defaultValue;
+
+    final value = double.tryParse(this!);
+    if (value == null) return defaultValue;
+
+    return value.toStringAsFixed(fractionDigits);
+  }
 }
 import 'package:lmt/src/models/site_detail_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -836,6 +875,8 @@ class SiteDetailModel {
 
   bool get hasLocations => fatLatLng != null && customerLatLng != null;
 
+  bool get hasPole => (poles ?? []).isNotEmpty;
+
   bool get canDrawPolyLine {
     int count = 0;
     if (customerLatLng != null) count++;
@@ -847,6 +888,19 @@ class SiteDetailModel {
 
     return count > 1;
   }
+
+  String? _formatCoord(double? value) {
+    if (value == null) return null;
+    return value.toStringAsFixed(6);
+  }
+
+  // Customer
+  String? get customerLatLabel => _formatCoord(customerLat);
+  String? get customerLngLabel => _formatCoord(customerLng);
+
+  // FAT
+  String? get fatLatLabel => _formatCoord(fatLat);
+  String? get fatLngLabel => _formatCoord(fatLng);
 
   factory SiteDetailModel.fromJson(Map<String, dynamic> json) {
     return SiteDetailModel(circuitId: json['circuit_id'])
@@ -1087,9 +1141,11 @@ class SectionCard extends StatelessWidget {
     );
   }
 }
+import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:lmt/core/constants/app_functions.dart';
 import 'package:lmt/core/repositories/site_repository.dart';
 import 'package:lmt/core/services/site_service.dart';
 import 'package:lmt/core/services/storage_service.dart';
@@ -1152,12 +1208,9 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
   final List<_PoleEntry> _poles = [];
 
   // ── Gallery ──────────────────────────────────────────────────────────────
-  // Existing URLs loaded from DB (shown when no new file picked)
   final Map<String, String?> _existingUrls = {};
-  // Newly picked local files (override existing on save)
   final Map<String, XFile?> _newFiles = {};
-
-  final List<XFile> _d4NewImages = []; // newly picked files
+  final List<XFile> _d4NewImages = [];
   final List<String> _d4ExistingUrls = [];
 
   // ── Load ─────────────────────────────────────────────────────────────────
@@ -1172,7 +1225,6 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
     final model = await _service.getSite(widget.circuitId);
     if (model == null || !mounted) return;
 
-    // A
     _circuitIdCtrl.text = model.circuitId;
     _customerNameCtrl.text = model.customerName ?? '';
     _lspNameCtrl.text = model.lspName ?? '';
@@ -1180,8 +1232,6 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
     _customerLngCtrl.text = model.customerLng?.toString() ?? '';
     _workOrderDate = model.workOrderDateTime;
     _activationDate = model.activationDateTime;
-
-    // B
     _surveyDate = model.surveyResultDateTime;
     _fatNameCtrl.text = model.fatName ?? '';
     _fatPortCtrl.text = model.fatPortNumber ?? '';
@@ -1193,25 +1243,19 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
     _optAtb1490Ctrl.text = model.opticalLevelAtbPort1490nm?.toString() ?? '';
     _dropCableCtrl.text = model.dropCableLengthInMeter ?? '';
     _rowIssueCtrl.text = model.rowIssue ?? '';
-
-    // Additional
     _ontSnCtrl.text = model.ontSnNumber ?? '';
     _splitterCtrl.text = model.splitterNo ?? '';
     _wifiSsidCtrl.text = model.wifiSsid ?? '';
     _msanCtrl.text = model.msan ?? '';
     _linkIdCtrl.text = model.linkId ?? '';
     _poleRangeCtrl.text = model.poleRange ?? '';
-
-    // G
     _checkAreaCtrl.text = model.checkArea ?? '';
     _conclusionCtrl.text = model.conclusionAndComments ?? '';
 
-    // Poles
     for (final p in model.poles ?? []) {
       _poles.add(_PoleEntry.fromModel(p));
     }
 
-    // Gallery existing URLs
     final g = model.gallery;
     if (g != null) {
       _existingUrls.addAll({
@@ -1253,7 +1297,7 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
   // ── Image picker ──────────────────────────────────────────────────────────
 
   Future<XFile?> _pickImageFromSource() async {
-    final src = await showModalBottomSheet<ImageSource>(
+    final choice = await showModalBottomSheet<String>(
       context: context,
       builder: (_) => SafeArea(
         child: Column(
@@ -1262,19 +1306,92 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
             ListTile(
               leading: const Icon(Icons.camera_alt),
               title: const Text('Camera'),
-              onTap: () => Navigator.pop(context, ImageSource.camera),
+              onTap: () => Navigator.pop(context, 'camera'),
             ),
             ListTile(
               leading: const Icon(Icons.photo_library),
               title: const Text('Gallery'),
-              onTap: () => Navigator.pop(context, ImageSource.gallery),
+              onTap: () => Navigator.pop(context, 'gallery'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.content_paste),
+              title: const Text('Paste from clipboard'),
+              onTap: () => Navigator.pop(context, 'paste'),
             ),
           ],
         ),
       ),
     );
-    if (src == null) return null;
+    if (choice == null) return null;
+    if (choice == 'paste') return _readClipboardImage();
+    final src = choice == 'camera' ? ImageSource.camera : ImageSource.gallery;
     return _picker.pickImage(source: src, imageQuality: 80);
+  }
+
+  /// Reads an image from the system clipboard using super_clipboard.
+  Future<XFile?> _readClipboardImage() async {
+    final bytes = await readClipboardImage();
+
+    if (bytes != null) {
+      return XFile.fromData(bytes);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No image in clipboard")),
+      );
+    }
+    //   final clipboard = SystemClipboard.instance;
+    //   if (clipboard == null) {
+    //     if (mounted) {
+    //       ScaffoldMessenger.of(context).showSnackBar(
+    //         const SnackBar(content: Text('Clipboard not available on this platform.')),
+    //       );
+    //     }
+    //     return null;
+    //   }
+
+    //   final reader = await clipboard.read();
+
+    //   superPrint(reader.items.first);
+    //   superPrint((await reader.items.first.getVirtualFileReceiver()).);
+
+    //   for (final format in [Formats.png, Formats.jpeg, Formats.gif, Formats.webp]) {
+    //     if (reader.canProvide(format)) {
+    //       final completer = Completer<XFile?>();
+    //       reader.getFile(format, (file) async {
+    //         try {
+    //           final bytes = await file.readAll();
+    //           final ext = format == Formats.png
+    //               ? 'png'
+    //               : format == Formats.jpeg
+    //               ? 'jpg'
+    //               : format == Formats.gif
+    //               ? 'gif'
+    //               : 'webp';
+    //           final mime = format == Formats.png
+    //               ? 'image/png'
+    //               : format == Formats.jpeg
+    //               ? 'image/jpeg'
+    //               : format == Formats.gif
+    //               ? 'image/gif'
+    //               : 'image/webp';
+    //           completer.complete(
+    //             XFile.fromData(bytes, name: 'pasted.$ext', mimeType: mime),
+    //           );
+    //         } catch (_) {
+    //           completer.complete(null);
+    //         }
+    //       }, onError: (_) => completer.complete(null));
+    //       final result = await completer.future;
+    //       if (result != null) return result;
+    //     }
+    //   }
+
+    //   if (mounted) {
+    //     ScaffoldMessenger.of(context).showSnackBar(
+    //       const SnackBar(content: Text('No image found in clipboard.')),
+    //     );
+    //   }
+    return null;
   }
 
   Future<void> _pickGalleryImage(String key) async {
@@ -1291,9 +1408,9 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
     final picked = await _pickImageFromSource();
     if (picked != null) setState(() => _d4NewImages.add(picked));
   }
+
   // ── Photo slot ────────────────────────────────────────────────────────────
 
-  /// Shows new local file if picked, falls back to existing URL, else empty slot.
   Widget _photoSlot({
     required BuildContext context,
     required XFile? newFile,
@@ -1306,34 +1423,16 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
     final hasExisting = existingUrl != null && existingUrl.isNotEmpty;
 
     Future<void> handleTap() async {
-      /// EMPTY → PICK IMAGE
       if (!hasNew && !hasExisting) {
         onTap();
         return;
       }
-
-      /// NEW LOCAL IMAGE → VIEWER
       if (hasNew) {
         final bytes = await newFile.readAsBytes();
-        if (context.mounted) {
-          openImageViewer(
-            context: context,
-            bytes: bytes,
-            title: label,
-          );
-        }
-
+        if (context.mounted) openImageViewer(context: context, bytes: bytes, title: label);
         return;
       }
-
-      /// EXISTING URL → VIEWER
-      if (hasExisting) {
-        openImageViewer(
-          context: context,
-          url: existingUrl,
-          title: label,
-        );
-      }
+      if (hasExisting) openImageViewer(context: context, url: existingUrl, title: label);
     }
 
     return GestureDetector(
@@ -1358,30 +1457,16 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-
-                    /// ✅ FIXED IMAGE DISPLAY
                     child: hasNew
                         ? FutureBuilder<Uint8List>(
                             future: newFile.readAsBytes(),
                             builder: (context, snap) {
-                              if (!snap.hasData) {
-                                return const Center(
-                                  child: CircularProgressIndicator(),
-                                );
-                              }
-                              return Image.memory(
-                                snap.data!,
-                                fit: BoxFit.contain,
-                              );
+                              if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+                              return Image.memory(snap.data!, fit: BoxFit.contain);
                             },
                           )
-                        : Image.network(
-                            existingUrl!,
-                            fit: BoxFit.contain,
-                          ),
+                        : Image.network(existingUrl!, fit: BoxFit.contain),
                   ),
-
-                  /// BADGE
                   Positioned(
                     top: 4,
                     left: 4,
@@ -1393,16 +1478,10 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
                       ),
                       child: Text(
                         hasNew ? 'NEW' : 'SAVED',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
-
-                  /// REMOVE BUTTON
                   Positioned(
                     top: 4,
                     right: 4,
@@ -1425,10 +1504,7 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
                   Text(
                     label,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey,
-                    ),
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                 ],
               ),
@@ -1551,9 +1627,8 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
         ..checkArea = _checkAreaCtrl.text.trim().nullIfEmpty
         ..conclusionAndComments = _conclusionCtrl.text.trim().nullIfEmpty;
 
-      // Build gallery: upload new files, keep existing URLs, clear removed ones
       final gallery = SiteGalleryModel(circuitId: circuitId);
-      final allKeys = {
+      const allKeys = {
         'an_node',
         'd1_1',
         'd1_2',
@@ -1583,7 +1658,6 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
       for (final key in allKeys) {
         final newFile = _newFiles[key];
         final existingUrl = _existingUrls[key];
-
         String? finalUrl;
         if (newFile != null) {
           finalUrl = await _storage.uploadImage(
@@ -1592,14 +1666,12 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
             folder: key,
           );
         } else {
-          finalUrl = existingUrl; // keep existing or null if removed
+          finalUrl = existingUrl;
         }
-
         _setGalleryUrl(gallery, key, finalUrl);
       }
-      final d4Urls = List<String>.from(_d4ExistingUrls);
 
-      // Upload new D4 images (offset index past existing ones)
+      final d4Urls = List<String>.from(_d4ExistingUrls);
       for (int i = 0; i < _d4NewImages.length; i++) {
         final url = await _storage.uploadImage(
           circuitId: circuitId,
@@ -1611,13 +1683,11 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
       gallery.d4 = d4Urls.isEmpty ? null : d4Urls;
       model.gallery = gallery;
 
-      // Poles: upload new pole images, keep existing URLs
       model.poles = await Future.wait(
         _poles.asMap().entries.map((e) async {
           final index = e.key;
           final p = e.value;
           String? imageUrl;
-
           if (p.newImage != null) {
             imageUrl = await _storage.uploadImage(
               circuitId: circuitId,
@@ -1625,9 +1695,8 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
               folder: 'pole_${(index + 1).toString().padLeft(3, '0')}',
             );
           } else {
-            imageUrl = p.existingImageUrl; // keep existing or null if removed
+            imageUrl = p.existingImageUrl;
           }
-
           return SitePoleModel(
             id: p.existingId,
             circuitId: circuitId,
@@ -1734,11 +1803,7 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
   Widget build(BuildContext context) {
     if (_loading) {
       return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(
-            color: Colors.grey,
-          ),
-        ),
+        body: Center(child: CircularProgressIndicator(color: Colors.grey)),
       );
     }
 
@@ -1752,17 +1817,11 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
               child: SizedBox(
                 width: 20,
                 height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.black,
-                ),
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
               ),
             )
           else
-            IconButton(
-              onPressed: _save,
-              icon: Icon(Icons.save),
-            ),
+            IconButton(onPressed: _save, icon: const Icon(Icons.save)),
         ],
       ),
       body: ListView(
@@ -1787,7 +1846,6 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
       title: 'A  Circuit ID Information',
       child: Column(
         children: [
-          // Circuit ID is read-only on update
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: TextField(
@@ -1956,7 +2014,6 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
 
   // ── D ─────────────────────────────────────────────────────────────────────
 
-  // 4. Replace _sectionD entirely
   Widget _sectionD() {
     return SectionCard(
       title: 'D  Onsite Installation – FAT',
@@ -1976,7 +2033,6 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
           _twoPhotoRow('d3_1', 'Label 1', 'd3_2', 'Label 2'),
           const SizedBox(height: 12),
           const _SubLabel('D4  Accessories (clamp / hook / buckle)'),
-          // Existing D4 URLs (from DB) that haven't been replaced
           ..._d4ExistingUrls.asMap().entries.map(
             (e) => Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -1990,7 +2046,6 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
               ),
             ),
           ),
-          // Newly picked D4 images
           ..._d4NewImages.asMap().entries.map(
             (e) => Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -2112,8 +2167,8 @@ class _PoleEntry {
   EnumPoleType? type;
   final latCtrl = TextEditingController();
   final lngCtrl = TextEditingController();
-  String? existingImageUrl; // URL from DB
-  XFile? newImage; // locally picked, not yet uploaded
+  String? existingImageUrl;
+  XFile? newImage;
 
   _PoleEntry();
 
@@ -2279,441 +2334,533 @@ class _SiteDetailPageState extends State<SiteDetailPage> {
   Widget _mapSection(BuildContext context, SiteDetailModel site) {
     final poles = site.poles ?? [];
     final size = MediaQuery.of(context).size;
-    return SizedBox(
-      width: size.aspectRatio > 1 ? min(200, size.width) : size.width,
-      height: size.aspectRatio > 1 ? min(400, (size.width / 2)) : size.width,
-
-      child: Screenshot(
-        controller: _screenshotController,
-        child: LayoutBuilder(
-          builder: (a1, c1) {
-            return Column(
-              children: [
-                Expanded(
-                  child: FlutterMap(
-                    options: MapOptions(
-                      initialCameraFit: !site.hasLocations
-                          ? null
-                          : CameraFit.bounds(bounds: LatLngBounds(site.fatLatLng!, site.customerLatLng!), padding: EdgeInsets.all(32)),
-                    ),
-                    children: [
-                      TileLayer(
-                        urlTemplate: 'https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png',
-                        userAgentPackageName: 'LMT',
-                      ),
-                      PolylineLayer(
-                        polylines: [
-                          if (site.canDrawPolyLine)
-                            Polyline(
-                              color: Colors.blue,
-                              pattern: StrokePattern.solid(),
-                              strokeWidth: 2,
-                              points: [
-                                if (site.customerLatLng != null) site.customerLatLng!,
-                                ...(poles.where((e) => e.hasLocations)).map((p) {
-                                  return LatLng(p.lat!, p.lng!);
-                                }),
-                                if (site.fatLat != null) site.fatLatLng!,
-                              ],
-                            ),
-                        ],
-                      ),
-                      MarkerLayer(
-                        markers: [
-                          if (site.customerLatLng != null)
-                            Marker(
-                              width: 25,
-                              height: 25,
-                              point: site.customerLatLng!,
-                              alignment: Alignment.topCenter,
-                              child: SizedBox(
-                                width: 25,
-                                height: 25,
-                                child: Card(
-                                  margin: EdgeInsets.zero,
-                                  elevation: 0,
-                                  shape: CircleBorder(),
-                                  color: Colors.green,
-                                  child: Icon(
-                                    Icons.home,
-                                    color: Colors.white,
-                                    size: 16,
-                                  ),
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Center(
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: Colors.black,
+            ),
+          ),
+          width: size.height * 0.6,
+          height: size.height * 0.5,
+          child: Screenshot(
+            controller: _screenshotController,
+            child: LayoutBuilder(
+              builder: (a1, c1) {
+                return Column(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: FlutterMap(
+                        options: MapOptions(
+                          initialCameraFit: !site.hasLocations
+                              ? null
+                              : CameraFit.bounds(bounds: LatLngBounds(site.fatLatLng!, site.customerLatLng!), padding: EdgeInsets.all(32)),
+                        ),
+                        children: [
+                          TileLayer(
+                            urlTemplate: 'https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png',
+                            userAgentPackageName: 'LMT',
+                          ),
+                          PolylineLayer(
+                            polylines: [
+                              if (site.canDrawPolyLine)
+                                Polyline(
+                                  color: Colors.blue,
+                                  pattern: StrokePattern.solid(),
+                                  strokeWidth: 2,
+                                  points: [
+                                    if (site.customerLatLng != null) site.customerLatLng!,
+                                    ...(poles.where((e) => e.hasLocations)).map((p) {
+                                      return LatLng(p.lat!, p.lng!);
+                                    }),
+                                    if (site.fatLat != null) site.fatLatLng!,
+                                  ],
                                 ),
-                              ),
-                            ),
-                          if (site.fatLatLng != null)
-                            Marker(
-                              width: 30,
-                              height: 30,
-                              point: site.fatLatLng!,
-                              alignment: Alignment.topCenter,
-                              child: Icon(
-                                Icons.location_on_rounded,
-                                color: Colors.green,
-                                size: 30,
-                              ),
-                            ),
-                          ...(site.poles ?? []).map((p) {
-                            Color color = Colors.black;
-                            if (p.enumPoleType != null) {
-                              switch (p.enumPoleType) {
-                                case null:
-                                  color = Colors.black;
-                                case EnumPoleType.epc:
-                                  color = Colors.red;
-                                case EnumPoleType.mpt:
-                                  color = Colors.green;
-                                case EnumPoleType.other:
-                                  color = Colors.blue;
-                              }
-                            }
-                            return Marker(
-                              width: 25,
-                              height: 25,
-                              point: LatLng(p.lat ?? 0, p.lng ?? 0),
-                              alignment: Alignment.center,
-                              child: Card(
-                                elevation: 0,
-                                shape: CircleBorder(),
-                                color: color,
-                                child: Center(
-                                  child: Container(
-                                    height: 3,
-                                    width: 35,
-                                    color: Colors.black,
-                                  ),
-                                ),
-                              ),
-                            );
-                          }),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                Align(
-                  alignment: AlignmentGeometry.bottomLeft,
-                  child: SizedBox(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Expanded(
-                          flex: 3,
-                          child: Table(
-                            border: TableBorder.all(color: Colors.black.withAlpha((0.6 * 255).toInt())),
-                            columnWidths: {
-                              0: FlexColumnWidth(1),
-                              1: FlexColumnWidth(3),
-                              2: FlexColumnWidth(4),
-                              3: FlexColumnWidth(2),
-                              4: FlexColumnWidth(3),
-                            },
-                            children: [
-                              TableRow(
-                                decoration: BoxDecoration(color: Colors.lightBlue.withAlpha((0.9 * 255).toInt())),
-                                children: [
-                                  Center(
-                                    child: Text(
-                                      'No',
-                                      style: TextStyle(color: Colors.black),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Text(
-                                      'Outline',
-                                      style: TextStyle(color: Colors.black),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: FittedBox(
-                                      child: Text(
-                                        'Description',
-                                        style: TextStyle(color: Colors.black),
-                                      ),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Text(
-                                      'Unit',
-                                      style: TextStyle(color: Colors.black),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Text(
-                                      'Qty',
-                                      style: TextStyle(color: Colors.black),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              TableRow(
-                                decoration: BoxDecoration(color: Colors.white.withAlpha((0.9 * 255).toInt())),
-                                children: [
-                                  Center(
-                                    child: Text('1'),
-                                  ),
-                                  Center(
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 6),
-                                      child: Container(
-                                        height: 2,
-                                        width: 20,
-                                        decoration: BoxDecoration(color: Colors.blue),
-                                      ),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Padding(
-                                      padding: EdgeInsets.symmetric(horizontal: 4),
-                                      child: Text(
-                                        'Drop Cable Length',
-                                        style: TextStyle(color: Colors.black, fontSize: 12),
-                                      ),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Text(
-                                      'Meter',
-                                      style: TextStyle(color: Colors.black),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Text(
-                                      _site?.dropCableLengthInMeter ?? '-',
-                                      style: TextStyle(color: Colors.black),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              TableRow(
-                                decoration: BoxDecoration(color: Colors.white.withAlpha((0.9 * 255).toInt())),
-                                children: [
-                                  Center(
-                                    child: Text('2'),
-                                  ),
-                                  Center(
-                                    child: SizedBox(
-                                      width: 25,
-                                      height: 25,
-                                      child: Card(
-                                        elevation: 0,
-                                        shape: CircleBorder(),
-                                        color: Colors.blue,
-                                        child: Center(
-                                          child: Container(
-                                            height: 3,
-                                            width: 35,
-                                            color: Colors.black,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Padding(
-                                      padding: EdgeInsets.symmetric(horizontal: 4),
-                                      child: Text(
-                                        'Other Pole',
-                                        style: TextStyle(color: Colors.black),
-                                      ),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Text(
-                                      'Pcs',
-                                      style: TextStyle(color: Colors.black),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Text(
-                                      poles.where((p) => p.enumPoleType == EnumPoleType.other).length.toString(),
-                                      style: TextStyle(color: Colors.black),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              TableRow(
-                                decoration: BoxDecoration(color: Colors.white.withAlpha((0.9 * 255).toInt())),
-                                children: [
-                                  Center(
-                                    child: Text('3'),
-                                  ),
-                                  Center(
-                                    child: SizedBox(
-                                      width: 25,
-                                      height: 25,
-                                      child: Card(
-                                        elevation: 0,
-                                        shape: CircleBorder(),
-                                        color: Colors.red,
-                                        child: Center(
-                                          child: Container(
-                                            height: 3,
-                                            width: 35,
-                                            color: Colors.black,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Padding(
-                                      padding: EdgeInsets.symmetric(horizontal: 4),
-                                      child: Text(
-                                        'EPC Pole',
-                                        style: TextStyle(color: Colors.black),
-                                      ),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Text(
-                                      'Pcs',
-                                      style: TextStyle(color: Colors.black),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Text(
-                                      poles.where((p) => p.enumPoleType == EnumPoleType.epc).length.toString(),
-                                      style: TextStyle(color: Colors.black),
-                                    ),
-                                  ),
-                                ],
-                              ),
-
-                              TableRow(
-                                decoration: BoxDecoration(color: Colors.white.withAlpha((0.9 * 255).toInt())),
-                                children: [
-                                  Center(
-                                    child: Text('4'),
-                                  ),
-                                  Center(
-                                    child: SizedBox(
-                                      width: 25,
-                                      height: 25,
-                                      child: Card(
-                                        elevation: 0,
-                                        shape: CircleBorder(),
-                                        color: Colors.green,
-                                        child: Center(
-                                          child: Container(
-                                            height: 3,
-                                            width: 35,
-                                            color: Colors.black,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Padding(
-                                      padding: EdgeInsets.symmetric(horizontal: 4),
-                                      child: Text(
-                                        'MPT Pole',
-                                        style: TextStyle(color: Colors.black),
-                                      ),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Text(
-                                      'Pcs',
-                                      style: TextStyle(color: Colors.black),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Text(
-                                      poles.where((p) => p.enumPoleType == EnumPoleType.mpt).length.toString(),
-                                      style: TextStyle(color: Colors.black),
-                                    ),
-                                  ),
-                                ],
-                              ),
                             ],
                           ),
-                        ),
-                        Expanded(
-                          flex: 1,
-                          child: Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Column(
-                              spacing: 8,
-                              children: [
-                                Container(
-                                  width: double.infinity,
-                                  decoration: BoxDecoration(
-                                    border: Border.all(color: Colors.black),
-                                  ),
-                                  child: Padding(
-                                    padding: EdgeInsets.all(8),
-                                    child: Column(
-                                      children: [
-                                        Text(
-                                          'N: ${_site?.customerLat.toString().substring(0, min((_site?.customerLat ?? '-').toString().length, 7)) ?? '-'}',
-                                          style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold),
-                                        ),
-                                        Text(
-                                          'E: ${_site?.customerLng.toString().substring(0, min((_site?.customerLng ?? '-').toString().length, 7)) ?? '-'}',
-                                          style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold),
-                                        ),
-                                        FittedBox(
-                                          child: Text(
-                                            _site?.circuitId ?? '-',
-                                            style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold),
+
+                          MarkerLayer(
+                            markers: [
+                              //cus pin
+                              if (site.customerLatLng != null)
+                                Marker(
+                                  width: 50,
+                                  height: 30,
+                                  point: site.customerLatLng!,
+                                  alignment: Alignment.topCenter,
+                                  child: Column(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          site.circuitId,
+                                          style: TextStyle(
+                                            fontSize: 5,
+                                            foreground: Paint()
+                                              ..style = PaintingStyle.stroke
+                                              ..strokeWidth = 0.8
+                                              ..color = Colors.black,
                                           ),
                                         ),
-                                      ],
+                                      ),
+                                      SizedBox(
+                                        width: 15,
+                                        height: 15,
+                                        child: Card(
+                                          margin: EdgeInsets.zero,
+                                          elevation: 0,
+                                          shape: CircleBorder(),
+                                          color: Colors.green,
+                                          child: Icon(
+                                            Icons.home,
+                                            color: Colors.white,
+                                            size: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              //cus info
+                              if (site.customerLatLng != null)
+                                Marker(
+                                  width: 80,
+                                  height: 40,
+                                  point: site.customerLatLng!,
+                                  alignment: Alignment.bottomCenter,
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      border: Border.all(),
+                                      color: Colors.white.withAlpha((0.7 * 255).toInt()),
+                                    ),
+                                    child: SizedBox.expand(
+                                      child: LayoutBuilder(
+                                        builder: (a1, c1) {
+                                          return Padding(
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: c1.maxWidth * 0.05,
+                                              vertical: c1.maxHeight * 0.05,
+                                            ),
+                                            child: Column(
+                                              children: [
+                                                Expanded(
+                                                  child: FittedBox(child: Text('N: ${_site?.customerLatLabel ?? '-'}')),
+                                                ),
+                                                Expanded(
+                                                  child: FittedBox(child: Text('E: ${_site?.customerLngLabel ?? '-'}')),
+                                                ),
+                                                Expanded(
+                                                  child: FittedBox(
+                                                    alignment: Alignment.center,
+                                                    child: Text(_site?.circuitId ?? ''),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        },
+                                      ),
                                     ),
                                   ),
                                 ),
-                                Container(
-                                  width: double.infinity,
-                                  decoration: BoxDecoration(
-                                    border: Border.all(color: Colors.black),
+                              //fatPin
+                              if (site.fatLatLng != null)
+                                Marker(
+                                  width: 50,
+                                  height: 30,
+                                  point: site.fatLatLng!,
+                                  alignment: Alignment.topCenter,
+                                  child: Column(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          site.fatName ?? '-',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            foreground: Paint()
+                                              ..style = PaintingStyle.stroke
+                                              ..strokeWidth = 0.8
+                                              ..color = Colors.black,
+                                          ),
+                                        ),
+                                      ),
+                                      SizedBox(
+                                        width: 15,
+                                        height: 15,
+                                        child: Icon(
+                                          Icons.location_on_rounded,
+                                          color: Colors.green,
+                                          size: 12,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  child: Padding(
-                                    padding: EdgeInsets.all(8),
-                                    child: Column(
-                                      children: [
-                                        Text(
-                                          'N: ${_site?.fatLat.toString().substring(0, min((_site?.fatLat ?? '-').toString().length, 7)) ?? '-'}',
-                                          style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold),
-                                        ),
-                                        Text(
-                                          'E: ${_site?.fatLng.toString().substring(0, min((_site?.fatLng ?? '-').toString().length, 7)) ?? '-'}',
-                                          style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold),
-                                        ),
-                                        Text(
-                                          _site?.fatName ?? '-',
-                                          style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold),
-                                        ),
-                                      ],
+                                ),
+                              //fat info
+                              if (site.fatLatLng != null)
+                                Marker(
+                                  width: 80,
+                                  height: 40,
+                                  point: site.fatLatLng!,
+                                  alignment: Alignment.bottomCenter,
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      border: Border.all(),
+                                      color: Colors.white.withAlpha((0.7 * 255).toInt()),
+                                    ),
+                                    child: SizedBox.expand(
+                                      child: LayoutBuilder(
+                                        builder: (a1, c1) {
+                                          return Padding(
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: c1.maxWidth * 0.05,
+                                              vertical: c1.maxHeight * 0.05,
+                                            ),
+                                            child: Column(
+                                              children: [
+                                                Expanded(
+                                                  child: FittedBox(
+                                                    alignment: Alignment.center,
+                                                    child: Text('Lat: ${_site?.fatLatLabel ?? '-'}'),
+                                                  ),
+                                                ),
+                                                Expanded(
+                                                  child: FittedBox(
+                                                    alignment: Alignment.center,
+                                                    child: Text('Lat: ${_site?.fatLngLabel ?? '-'}'),
+                                                  ),
+                                                ),
+                                                Expanded(
+                                                  child: FittedBox(
+                                                    alignment: Alignment.center,
+                                                    child: Text(_site?.fatName ?? ''),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        },
+                                      ),
                                     ),
                                   ),
                                 ),
-                                Container(
-                                  width: double.infinity,
-                                  decoration: BoxDecoration(
-                                    border: Border.all(color: Colors.black),
+                              //cable marker
+                              Marker(
+                                width: 50,
+                                height: 35,
+                                point: site.hasPole
+                                    ? LatLng(poles.first.lat ?? 0, poles.first.lng ?? 0)
+                                    : AppFunctions.getMidPointSimple(
+                                        site.customerLatLng ?? LatLng(0, 0),
+                                        site.fatLatLng ?? LatLng(0, 0),
+                                      ),
+                                alignment: Alignment.bottomCenter,
+                                child: Padding(
+                                  padding: EdgeInsets.only(
+                                    top: 15,
                                   ),
-                                  child: Padding(
-                                    padding: EdgeInsets.all(8),
-                                    child: Text(
-                                      _site?.lspName ?? '-',
-                                      style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold),
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withAlpha((0.7 * 255).toInt()),
+                                    ),
+                                    child: SizedBox.expand(
+                                      child: LayoutBuilder(
+                                        builder: (a1, c1) {
+                                          return Center(
+                                            child: Text('${site.dropCableLengthInMeter ?? 0}'),
+                                          );
+                                        },
+                                      ),
                                     ),
                                   ),
+                                ),
+                              ),
+
+                              ...(site.poles ?? []).map((p) {
+                                Color color = Colors.black;
+                                if (p.enumPoleType != null) {
+                                  switch (p.enumPoleType) {
+                                    case null:
+                                      color = Colors.black;
+                                    case EnumPoleType.epc:
+                                      color = Colors.red;
+                                    case EnumPoleType.mpt:
+                                      color = Colors.green;
+                                    case EnumPoleType.other:
+                                      color = Colors.blue;
+                                  }
+                                }
+                                return Marker(
+                                  width: 25,
+                                  height: 25,
+                                  point: LatLng(p.lat ?? 0, p.lng ?? 0),
+                                  alignment: Alignment.center,
+                                  child: Card(
+                                    elevation: 0,
+                                    shape: CircleBorder(),
+                                    color: color,
+                                    child: Center(
+                                      child: Container(
+                                        height: 3,
+                                        width: 35,
+                                        color: Colors.black,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: Table(
+                              border: TableBorder.all(color: Colors.black.withAlpha((0.6 * 255).toInt())),
+                              columnWidths: {
+                                0: FlexColumnWidth(1),
+                                1: FlexColumnWidth(3),
+                                2: FlexColumnWidth(4),
+                                3: FlexColumnWidth(2),
+                                4: FlexColumnWidth(3),
+                              },
+                              children: [
+                                TableRow(
+                                  decoration: BoxDecoration(color: Colors.lightBlue.withAlpha((0.9 * 255).toInt())),
+                                  children: [
+                                    Center(
+                                      child: Text(
+                                        'No',
+                                        style: TextStyle(color: Colors.black),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Text(
+                                        'Outline',
+                                        style: TextStyle(color: Colors.black),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: FittedBox(
+                                        child: Text(
+                                          'Description',
+                                          style: TextStyle(color: Colors.black),
+                                        ),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Text(
+                                        'Unit',
+                                        style: TextStyle(color: Colors.black),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Text(
+                                        'Qty',
+                                        style: TextStyle(color: Colors.black),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                TableRow(
+                                  decoration: BoxDecoration(color: Colors.white.withAlpha((0.9 * 255).toInt())),
+                                  children: [
+                                    Center(
+                                      child: Text('1'),
+                                    ),
+                                    Center(
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 8),
+                                        child: Container(
+                                          height: 2,
+                                          width: 20,
+                                          decoration: BoxDecoration(color: Colors.blue),
+                                        ),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Padding(
+                                        padding: EdgeInsets.symmetric(horizontal: 4),
+                                        child: Text(
+                                          'Drop Cable Length',
+                                          style: TextStyle(color: Colors.black, fontSize: 12),
+                                        ),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Text(
+                                        'Meter',
+                                        style: TextStyle(color: Colors.black),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Text(
+                                        _site?.dropCableLengthInMeter ?? '-',
+                                        style: TextStyle(color: Colors.black),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                TableRow(
+                                  decoration: BoxDecoration(color: Colors.white.withAlpha((0.9 * 255).toInt())),
+                                  children: [
+                                    Center(
+                                      child: Text('2'),
+                                    ),
+                                    Center(
+                                      child: SizedBox(
+                                        width: 25,
+                                        height: 25,
+                                        child: Card(
+                                          elevation: 0,
+                                          shape: CircleBorder(),
+                                          color: Colors.blue,
+                                          child: Center(
+                                            child: Container(
+                                              height: 3,
+                                              width: 35,
+                                              color: Colors.black,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Padding(
+                                        padding: EdgeInsets.symmetric(horizontal: 4),
+                                        child: Text(
+                                          'Other Pole',
+                                          style: TextStyle(color: Colors.black),
+                                        ),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Text(
+                                        'Pcs',
+                                        style: TextStyle(color: Colors.black),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Text(
+                                        poles.where((p) => p.enumPoleType == EnumPoleType.other).length.toString(),
+                                        style: TextStyle(color: Colors.black),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                TableRow(
+                                  decoration: BoxDecoration(color: Colors.white.withAlpha((0.9 * 255).toInt())),
+                                  children: [
+                                    Center(
+                                      child: Text('3'),
+                                    ),
+                                    Center(
+                                      child: SizedBox(
+                                        width: 25,
+                                        height: 25,
+                                        child: Card(
+                                          elevation: 0,
+                                          shape: CircleBorder(),
+                                          color: Colors.red,
+                                          child: Center(
+                                            child: Container(
+                                              height: 3,
+                                              width: 35,
+                                              color: Colors.black,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Padding(
+                                        padding: EdgeInsets.symmetric(horizontal: 4),
+                                        child: Text(
+                                          'EPC Pole',
+                                          style: TextStyle(color: Colors.black),
+                                        ),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Text(
+                                        'Pcs',
+                                        style: TextStyle(color: Colors.black),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Text(
+                                        poles.where((p) => p.enumPoleType == EnumPoleType.epc).length.toString(),
+                                        style: TextStyle(color: Colors.black),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+
+                                TableRow(
+                                  decoration: BoxDecoration(color: Colors.white.withAlpha((0.9 * 255).toInt())),
+                                  children: [
+                                    Center(
+                                      child: Text('4'),
+                                    ),
+                                    Center(
+                                      child: SizedBox(
+                                        width: 25,
+                                        height: 25,
+                                        child: Card(
+                                          elevation: 0,
+                                          shape: CircleBorder(),
+                                          color: Colors.green,
+                                          child: Center(
+                                            child: Container(
+                                              height: 3,
+                                              width: 35,
+                                              color: Colors.black,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Padding(
+                                        padding: EdgeInsets.symmetric(horizontal: 4),
+                                        child: Text(
+                                          'MPT Pole',
+                                          style: TextStyle(color: Colors.black),
+                                        ),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Text(
+                                        'Pcs',
+                                        style: TextStyle(color: Colors.black),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Text(
+                                        poles.where((p) => p.enumPoleType == EnumPoleType.mpt).length.toString(),
+                                        style: TextStyle(color: Colors.black),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ),
-              ],
-            );
-          },
+                  ],
+                );
+              },
+            ),
+          ),
         ),
       ),
     );
@@ -3024,6 +3171,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:lmt/core/extensions/string_extension.dart';
 import 'package:lmt/src/models/site_detail_model.dart';
 import 'package:lmt/src/views/sites/detail/pdf_helper.dart';
 import 'package:pdf/pdf.dart';
@@ -3033,6 +3181,10 @@ import 'package:printing/printing.dart';
 // ---------------------------------------------------------------------------
 // PDF generation — runs in background isolate via compute().
 // ---------------------------------------------------------------------------
+
+PdfColor pdfColorBlue1 = PdfColor.fromHex('#90abdd');
+PdfColor pdfColorBlue2 = PdfColor.fromHex('#dae3f3');
+PdfColor pdfColorGrey1 = PdfColor.fromHex('#d9d9d9');
 
 Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
   final doc = pw.Document(title: 'Site Detail Report', author: 'Galaxia Net');
@@ -3063,7 +3215,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
           children: [
             pageHeader(mpt, ksgm),
             pw.SizedBox(height: 16),
-            txt('Galaxia @ Net CO.,LTD'.toUpperCase(), size: 18, color: PdfColors.blue),
+            txt('Galaxia @ Net CO.,LTD'.toUpperCase(), size: 18, color: pdfColorBlue1),
             pw.SizedBox(height: 32),
             txt('MPT-KSGM FTTH Project'.toUpperCase(), size: 18),
             pw.SizedBox(height: 32),
@@ -3145,22 +3297,25 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
             pw.SizedBox(height: 16),
             band('A', 'Circuit ID information'),
             dataRow('1', 'Circuit ID', circuitId),
-            dataRow2('2', 'Location (Coordinates)', 'Lat', s('customerLat'), 'Long', s('customerLng')),
+            dataRow2('2', 'Location (Coordinates)', 'Lat', s('customerLat').formatDecimal(), 'Long', s('customerLng').formatDecimal()),
             dataRow('3', 'Work Order Date/Time', s('workOrderDateTime')),
-            dataRow('4', 'Activation/Relocated Date/Time', s('activationDateTime')),
+            dataRow('4', 'Activation/Relocated Date', DateTime.tryParse(s('activationDateTime'))?.toString().substring(0, 10) ?? '-'),
             pw.SizedBox(height: 16),
             band('B', 'Site/FAT information'),
             dataRow('1', 'Survey Result (Feasible)', s('surveyResultDateTime')),
             dataRow('2', 'FAT Name', s('fatName')),
             dataRow('3', 'FAT Port No', s('fatPortNumber')),
-            dataRow2('4', 'FAT Location (Coordinates)', 'Lat', s('fatLat'), 'Long', s('fatLng')),
+            dataRow2('4', 'FAT Location (Coordinates)', 'Lat', s('fatLat').formatDecimal(), 'Long', s('fatLng').formatDecimal()),
             dataRow2('5', 'Optical Level at FAT port', '1310nm', s('opticalLevelFatPort1310nm'), '1490nm', s('opticalLevelFatPort1490nm')),
             dataRow2('6', 'Optical Level at ATB port', '1310nm', s('opticalLevelAtbPort1310nm'), '1490nm', s('opticalLevelAtbPort1490nm')),
             dataRow('7', 'Drop Cable Length (m)', s('dropCableLengthInMeter')),
             dataRow('8', 'ROW issue', s('rowIssue')),
             pw.SizedBox(height: 16),
             band('C', 'Cable Route Diagram'),
-            if (mapImg != null) pw.Expanded(child: pw.Image(pw.MemoryImage(mapImg))),
+            if (mapImg != null)
+              pw.Expanded(
+                child: pw.Center(child: pw.Image(pw.MemoryImage(mapImg), width: double.infinity)),
+              ),
             pageFooter(3),
           ],
         ),
@@ -3180,7 +3335,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
             pageHeader(mpt, ksgm),
             pw.SizedBox(height: 16),
             band('D', 'Onsite Installation Photo & Termination for FAT'),
-            band('I', 'Photos of FAT before installation', color: PdfColors.green200),
+            band('I', 'FAT photo & Accessories Photo', color: pdfColorGrey1),
             // D1:
             pw.Expanded(
               child: pw.Container(
@@ -3233,6 +3388,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                                       ],
                                     ),
                                   ),
+                                  pw.SizedBox(width: 10),
                                   pw.Expanded(
                                     child: pw.Column(
                                       children: [
@@ -3297,6 +3453,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                               child: pw.Row(
                                 children: [
                                   pw.Expanded(child: img('d2_1') == null ? pw.SizedBox.shrink() : pw.Image(img('d2_1')!)),
+                                  pw.SizedBox(width: 10),
                                   pw.Expanded(child: img('d2_2') == null ? pw.SizedBox.shrink() : pw.Image(img('d2_2')!)),
                                 ],
                               ),
@@ -3329,7 +3486,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
             pageHeader(mpt, ksgm),
             pw.SizedBox(height: 16),
             band('D', 'Onsite Installation Photo & Termination for FAT'),
-            band('II', 'FAT photo & Accessories Photo', color: PdfColors.blue50),
+            band('I', 'FAT photo & Accessories Photo', color: pdfColorGrey1),
             // D3: Cable label inside FAT — pair
             pw.Expanded(
               child: pw.Container(
@@ -3375,7 +3532,8 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                               child: pw.Row(
                                 children: [
                                   pw.Expanded(child: img('d3_1') == null ? pw.SizedBox.shrink() : pw.Image(img('d3_1')!)),
-                                  pw.Expanded(child: img('d3_1') == null ? pw.SizedBox.shrink() : pw.Image(img('d3_2')!)),
+                                  pw.SizedBox(width: 10),
+                                  pw.Expanded(child: img('d3_2') == null ? pw.SizedBox.shrink() : pw.Image(img('d3_2')!)),
                                 ],
                               ),
                             ),
@@ -3432,7 +3590,9 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                               child: pw.Row(
                                 children: [
                                   ...d4Bytes.map((d) {
-                                    return pw.Expanded(child: pw.Image(pw.MemoryImage(d)));
+                                    return pw.Expanded(
+                                      child: pw.Padding(padding: pw.EdgeInsets.only(right: 10), child: pw.Image(pw.MemoryImage(d))),
+                                    );
                                   }),
                                 ],
                               ),
@@ -3465,7 +3625,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
             pageHeader(mpt, ksgm),
             pw.SizedBox(height: 16),
             band('E', 'Onsite Installation Photo & Termination customer site'),
-            band('I', 'Drop cable photo and other facilities', color: PdfColors.blue50),
+            band('I', 'Drop cable photo and other facilities', color: pdfColorGrey1),
             // e1
             pw.Expanded(
               child: pw.Container(
@@ -3508,7 +3668,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                           children: [
                             txt('Photo of Outdoor Cable (Drop cable laid through route) Remark :Please take photo including FAT)'),
                             pw.Expanded(
-                              child: img('e1') == null ? pw.SizedBox.shrink() : pw.Image(img('e1')!),
+                              child: img('e1') == null ? pw.SizedBox.shrink() : pw.Center(child: pw.Image(img('e1')!)),
                             ),
                             txt('Whether there are any other fibers or not, please show/point out the related fiber clearly.'),
                           ],
@@ -3561,7 +3721,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                           children: [
                             txt('Photo of Customer Home entrance cable'),
                             pw.Expanded(
-                              child: img('e2') == null ? pw.SizedBox.shrink() : pw.Image(img('e2')!),
+                              child: img('e2') == null ? pw.SizedBox.shrink() : pw.Center(child: pw.Image(img('e2')!)),
                             ),
                           ],
                         ),
@@ -3613,7 +3773,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                           children: [
                             txt('Photo of Indoor Cable (Drop cable laid between customer entrance and ATB)'),
                             pw.Expanded(
-                              child: img('e3') == null ? pw.SizedBox.shrink() : pw.Image(img('e3')!),
+                              child: img('e3') == null ? pw.SizedBox.shrink() : pw.Center(child: pw.Image(img('e3')!)),
                             ),
                           ],
                         ),
@@ -3688,6 +3848,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                               child: pw.Row(
                                 children: [
                                   pw.Expanded(child: img('e4_1') == null ? pw.SizedBox.shrink() : pw.Image(img('e4_1')!)),
+                                  pw.SizedBox(width: 10),
                                   pw.Expanded(child: img('e4_2') == null ? pw.SizedBox.shrink() : pw.Image(img('e4_2')!)),
                                 ],
                               ),
@@ -3742,7 +3903,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                           children: [
                             txt('Photo of ATB'),
                             pw.Expanded(
-                              child: img('e5') == null ? pw.SizedBox.shrink() : pw.Image(img('e5')!),
+                              child: img('e5') == null ? pw.SizedBox.shrink() : pw.Center(child: pw.Image(img('e5')!)),
                             ),
                           ],
                         ),
@@ -3865,13 +4026,21 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                         child: pw.Column(
                           crossAxisAlignment: pw.CrossAxisAlignment.start,
                           children: [
-                            txt('Photo of Cable Coils(At customer side and FAT side)'),
+                            txt('Other Remark: ${s('cableDrumEnd')} - ${s('cableDrumStart')} = ${s('dropCableLengthInMeter')}m'),
                             pw.Expanded(
                               child: pw.Row(
                                 children: [
-                                  pw.Expanded(child: img('e6_1') == null ? pw.SizedBox.shrink() : pw.Image(img('e6_1')!)),
-                                  pw.Expanded(child: img('e6_2') == null ? pw.SizedBox.shrink() : pw.Image(img('e6_2')!)),
-                                  pw.Expanded(child: img('e6_3') == null ? pw.SizedBox.shrink() : pw.Image(img('e6_3')!)),
+                                  pw.Expanded(
+                                    child: img('e6_1') == null ? pw.SizedBox.shrink() : pw.AspectRatio(aspectRatio: 1, child: pw.Image(img('e6_1')!)),
+                                  ),
+                                  pw.SizedBox(width: 10),
+                                  pw.Expanded(
+                                    child: img('e6_2') == null ? pw.SizedBox.shrink() : pw.AspectRatio(aspectRatio: 1, child: pw.Image(img('e6_2')!)),
+                                  ),
+                                  pw.SizedBox(width: 10),
+                                  pw.Expanded(
+                                    child: img('e6_3') == null ? pw.SizedBox.shrink() : pw.AspectRatio(aspectRatio: 1, child: pw.Image(img('e6_3')!)),
+                                  ),
                                 ],
                               ),
                             ),
@@ -3903,7 +4072,8 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
             pageHeader(mpt, ksgm),
             pw.SizedBox(height: 16),
             band('F', 'ONT test and service test result'),
-            band('I', 'ONT information', color: PdfColors.blue50),
+            band('I', 'ONT information', color: pdfColorGrey1),
+            dataRow('1', 'ONT/SN number', s('ontSerialNumber')),
             // e1
             pw.Expanded(
               child: pw.Container(
@@ -3946,7 +4116,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                           children: [
                             txt('Photo of ONT'),
                             pw.Expanded(
-                              child: img('f1') == null ? pw.SizedBox.shrink() : pw.Image(img('f1')!),
+                              child: img('f1') == null ? pw.SizedBox.shrink() : pw.Center(child: pw.Image(img('f1')!)),
                             ),
                           ],
                         ),
@@ -3998,7 +4168,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                           children: [
                             txt('Photo of S/N Number of ONT'),
                             pw.Expanded(
-                              child: img('f2') == null ? pw.SizedBox.shrink() : pw.Image(img('f2')!),
+                              child: img('f2') == null ? pw.SizedBox.shrink() : pw.Center(child: pw.Image(img('f2')!)),
                             ),
                           ],
                         ),
@@ -4051,7 +4221,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                             txt('Photo of ONT installation environment'),
                             txt('(*) Do not put in places where are exposed to direct sunlight or extreme temperatures'),
                             pw.Expanded(
-                              child: img('f3') == null ? pw.SizedBox.shrink() : pw.Image(img('f3')!),
+                              child: img('f3') == null ? pw.SizedBox.shrink() : pw.Center(child: pw.Image(img('f3')!)),
                             ),
                           ],
                         ),
@@ -4081,7 +4251,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
             pageHeader(mpt, ksgm),
             pw.SizedBox(height: 16),
             band('F', 'ONT test and service test result'),
-            band('II', 'Service test result', color: PdfColors.blue50),
+            band('II', 'Service test result', color: pdfColorBlue2),
             // f4
             pw.Expanded(
               child: pw.Container(
@@ -4127,6 +4297,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                               child: pw.Row(
                                 children: [
                                   pw.Expanded(child: img('f4_1') == null ? pw.SizedBox.shrink() : pw.Image(img('f4_1')!)),
+                                  pw.SizedBox(width: 10),
                                   pw.Expanded(child: img('f4_2') == null ? pw.SizedBox.shrink() : pw.Image(img('f4_2')!)),
                                 ],
                               ),
@@ -4181,7 +4352,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                           children: [
                             txt('Internet Service test (Speed Test)'),
                             pw.Expanded(
-                              child: img('f5') == null ? pw.SizedBox.shrink() : pw.Image(img('f5')!),
+                              child: img('f5') == null ? pw.SizedBox.shrink() : pw.Center(child: pw.Image(img('f5')!)),
                             ),
                           ],
                         ),
@@ -4236,6 +4407,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                               child: pw.Row(
                                 children: [
                                   pw.Expanded(child: img('f6_1') == null ? pw.SizedBox.shrink() : pw.Image(img('f6_1')!)),
+                                  pw.SizedBox(width: 10),
                                   pw.Expanded(child: img('f6_2') == null ? pw.SizedBox.shrink() : pw.Image(img('f6_2')!)),
                                 ],
                               ),
@@ -4264,11 +4436,21 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
       header: (context) => pageHeader(mpt, ksgm),
       footer: (context) => pageFooter(context.pageNumber),
       build: (context) {
+        List rawPoles = [];
+        final remainder = poles.length % 4;
+        rawPoles = [
+          ...poles,
+          ...List.generate(
+            4 - remainder,
+            (index) => null,
+          ),
+        ];
+
         return [
           pw.Container(
             width: double.infinity,
             decoration: pw.BoxDecoration(
-              color: PdfColors.blue100,
+              color: pdfColorBlue2,
               border: pw.Border.all(
                 color: PdfColors.black,
               ),
@@ -4292,7 +4474,11 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                   flex: 2,
                   child: pw.Container(
                     width: double.infinity,
-                    decoration: pw.BoxDecoration(),
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border.all(
+                        color: PdfColors.black,
+                      ),
+                    ),
                     alignment: pw.Alignment.centerLeft,
                     child: pw.Padding(
                       padding: pw.EdgeInsets.all(8),
@@ -4304,11 +4490,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                   flex: 3,
                   child: pw.Container(
                     width: double.infinity,
-                    decoration: pw.BoxDecoration(
-                      border: pw.Border.all(
-                        color: PdfColors.black,
-                      ),
-                    ),
+
                     alignment: pw.Alignment.centerLeft,
                     child: pw.Padding(
                       padding: pw.EdgeInsets.all(8),
@@ -4382,11 +4564,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                   flex: 3,
                   child: pw.Container(
                     width: double.infinity,
-                    decoration: pw.BoxDecoration(
-                      border: pw.Border.all(
-                        color: PdfColors.black,
-                      ),
-                    ),
+
                     alignment: pw.Alignment.centerLeft,
                     child: pw.Padding(
                       padding: pw.EdgeInsets.all(8),
@@ -4433,7 +4611,8 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
           pw.GridView(
             crossAxisCount: 2,
             childAspectRatio: 6 / 5,
-            children: poles.map((pole) {
+            children: rawPoles.map((pole) {
+              final hasData = pole != null;
               return pw.Container(
                 width: double.infinity,
                 decoration: pw.BoxDecoration(
@@ -4493,7 +4672,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                                     ),
                                     child: pw.Padding(
                                       padding: pw.EdgeInsets.all(4),
-                                      child: txt('P_${(poles.indexOf(pole) + 1).toString().padLeft(3, '0')}', size: 10),
+                                      child: txt(!hasData ? '-' : 'P_${(poles.indexOf(pole) + 1).toString().padLeft(3, '0')}', size: 10),
                                     ),
                                   ),
                                 ),
@@ -4525,7 +4704,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                                     ),
                                     child: pw.Padding(
                                       padding: pw.EdgeInsets.all(4),
-                                      child: txt(pole['lat'].toString().substring(0, min(pole['lat'].toString().length, 7)), size: 10),
+                                      child: txt(!hasData ? '-' : pole['lat'].toString().substring(0, min(pole['lat'].toString().length, 7)), size: 10),
                                     ),
                                   ),
                                 ),
@@ -4557,7 +4736,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                                     ),
                                     child: pw.Padding(
                                       padding: pw.EdgeInsets.all(4),
-                                      child: txt(pole['lng'].toString().substring(0, min(pole['lng'].toString().length, 7)), size: 10),
+                                      child: txt(!hasData ? '-' : pole['lng'].toString().substring(0, min(pole['lng'].toString().length, 7)), size: 10),
                                     ),
                                   ),
                                 ),
@@ -4591,11 +4770,13 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                               ),
                             ),
                             pw.Expanded(
-                              child: pole['imageBytes'] == null
+                              child: !hasData
+                                  ? pw.SizedBox.shrink()
+                                  : pole['imageBytes'] == null
                                   ? pw.Center(child: txt('No Image', size: 10))
                                   : pw.Image(
                                       pw.MemoryImage(pole['imageBytes'] as Uint8List),
-                                      fit: pw.BoxFit.contain,
+                                      fit: pw.BoxFit.fill,
                                     ),
                             ),
                           ],
@@ -4703,6 +4884,8 @@ class _SiteDetailPdfViewPageState extends State<SiteDetailPdfViewPage> {
       'mapImage': widget.mapImage,
       // Text fields
       'circuitId': _sd.circuitId,
+      'cableDrumStart': _sd.cableDrumStart,
+      'cableDrumEnd': _sd.cableDrumEnd,
       'customerLat': _sd.customerLat?.toString(),
       'customerLng': _sd.customerLng?.toString(),
       'workOrderDateTime': _sd.workOrderDateTime?.toString().substring(0, 16),
@@ -4772,7 +4955,24 @@ class _SiteDetailPdfViewPageState extends State<SiteDetailPdfViewPage> {
         ],
       ),
       body: SizedBox.expand(
-        child: _isLoading ? _loadingView() : _pdfView(),
+        child: _isLoading
+            ? _loadingView()
+            : Column(
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Center(
+                          child: AspectRatio(
+                            aspectRatio: 7 / 10,
+                            child: _pdfView(),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
       ),
     );
   }
@@ -5020,6 +5220,7 @@ class _SiteMapEditPageState extends State<SiteMapEditPage> {
   }
 }
 import 'package:flutter/services.dart';
+import 'package:lmt/src/views/sites/detail/site_detail_pdf_view_page.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:pdf/pdf.dart';
 import 'package:http/http.dart' as http;
@@ -5076,7 +5277,7 @@ pw.Widget pageHeader(Uint8List mpt, Uint8List ksgm) => pw.Row(
 );
 
 pw.Widget pageFooter(int pageNo) => pw.Row(
-  mainAxisAlignment: pw.MainAxisAlignment.center,
+  mainAxisAlignment: pw.MainAxisAlignment.end,
   children: [txt(pageNo.toString())],
 );
 
@@ -5091,8 +5292,8 @@ pw.Widget band(String label, String title, {PdfColor? color}) => pw.Table(
   children: [
     pw.TableRow(
       children: [
-        cell(label, bg: color ?? PdfColors.blue300),
-        cell(title, bg: color ?? PdfColors.blue300, align: pw.Alignment.centerLeft),
+        cell(label, bg: color ?? pdfColorBlue1),
+        cell(title, bg: color ?? pdfColorBlue1, align: pw.Alignment.centerLeft),
       ],
     ),
   ],
@@ -5110,8 +5311,8 @@ pw.Widget dataRow(String num, String label, String value) => pw.Table(
   children: [
     pw.TableRow(
       children: [
-        cell(num, bg: PdfColors.blue50),
-        cell(label, bg: PdfColors.blue50, align: pw.Alignment.centerLeft),
+        cell(num, bg: pdfColorBlue2),
+        cell(label, bg: pdfColorBlue2, align: pw.Alignment.centerLeft),
         cell(value, align: pw.Alignment.centerLeft),
       ],
     ),
@@ -5131,11 +5332,11 @@ pw.Widget dataRow2(String num, String label, String k1, String v1, String k2, St
   children: [
     pw.TableRow(
       children: [
-        cell(num, bg: PdfColors.blue50),
-        cell(label, bg: PdfColors.blue50, align: pw.Alignment.centerLeft),
-        cell(k1, bg: PdfColors.blue50, child: txt(k1, size: 10), align: pw.Alignment.centerLeft),
+        cell(num, bg: pdfColorBlue2),
+        cell(label, bg: pdfColorBlue2, align: pw.Alignment.centerLeft),
+        cell(k1, bg: pdfColorBlue2, child: txt(k1, size: 10), align: pw.Alignment.centerLeft),
         cell(v1, align: pw.Alignment.centerLeft),
-        cell(k2, bg: PdfColors.blue50, child: txt(k2, size: 10), align: pw.Alignment.centerLeft),
+        cell(k2, bg: pdfColorBlue2, child: txt(k2, size: 10), align: pw.Alignment.centerLeft),
         cell(v2, align: pw.Alignment.centerLeft),
       ],
     ),
@@ -5324,7 +5525,7 @@ class _SiteListPageState extends State<SiteListPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('FTTH Sites'),
+        title: const Text('FTTH Sites - v(1.0.2)'),
         actions: [
           TextButton(
             onPressed: () async {
@@ -5417,6 +5618,8 @@ class _SiteListPageState extends State<SiteListPage> {
 import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:lmt/core/repositories/site_repository.dart';
+import 'package:lmt/core/services/site_service.dart';
 import 'package:lmt/src/models/site_detail_model.dart';
 import 'package:lmt/src/views/sites/detail/site_detail_page.dart';
 
@@ -5428,9 +5631,95 @@ class SiteImportPage extends StatefulWidget {
 }
 
 class _SiteImportPageState extends State<SiteImportPage> {
+  final _repo = SiteRepository(SupabaseSiteService());
+
   List<SiteDetailModel> sites = [];
+  final Set<int> _selectedIndexes = {};
   String? error;
   bool isLoading = false;
+  bool isCreating = false;
+
+  bool get _allSelected => sites.isNotEmpty && _selectedIndexes.length == sites.length;
+
+  void _toggleSelectAll() {
+    setState(() {
+      if (_allSelected) {
+        _selectedIndexes.clear();
+      } else {
+        _selectedIndexes.addAll(List.generate(sites.length, (i) => i));
+      }
+    });
+  }
+
+  void _toggleSelect(int index) {
+    setState(() {
+      if (_selectedIndexes.contains(index)) {
+        _selectedIndexes.remove(index);
+      } else {
+        _selectedIndexes.add(index);
+      }
+    });
+  }
+
+  // ── Create Sites ──────────────────────────────────────────────────────────
+
+  Future<void> _createSites() async {
+    if (_selectedIndexes.isEmpty) return;
+
+    setState(() => isCreating = true);
+
+    final selected = _selectedIndexes.map((i) => sites[i]).toList();
+
+    int successCount = 0;
+    final List<String> failedIds = [];
+
+    for (final site in selected) {
+      try {
+        await _repo.saveSite(site);
+        successCount++;
+      } catch (e) {
+        failedIds.add(site.circuitId);
+      }
+    }
+
+    if (!mounted) return;
+
+    setState(() => isCreating = false);
+
+    if (failedIds.isEmpty) {
+      // All succeeded — clear the list
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$successCount site(s) created successfully.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      setState(() {
+        sites.clear();
+        _selectedIndexes.clear();
+      });
+    } else {
+      // Partial failure — keep failed ones in list
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '$successCount created. ${failedIds.length} failed: ${failedIds.join(', ')}',
+          ),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 6),
+        ),
+      );
+
+      // Remove successful ones, keep failed ones
+      setState(() {
+        final failedSet = failedIds.toSet();
+        sites.removeWhere((s) => !failedSet.contains(s.circuitId));
+        _selectedIndexes.clear();
+      });
+    }
+  }
+
+  // ── File Picker ───────────────────────────────────────────────────────────
 
   Future<void> pickAndParseFile() async {
     try {
@@ -5454,21 +5743,24 @@ class _SiteImportPageState extends State<SiteImportPage> {
       if (bytes == null) throw Exception("Cannot read file");
 
       final content = utf8.decode(bytes);
-
       final parsed = parseTsv(content);
 
       setState(() {
         sites = parsed;
+        _selectedIndexes.clear();
         isLoading = false;
       });
     } catch (e) {
       setState(() {
         sites = [];
+        _selectedIndexes.clear();
         error = e.toString();
         isLoading = false;
       });
     }
   }
+
+  // ── TSV Parser ────────────────────────────────────────────────────────────
 
   List<SiteDetailModel> parseTsv(String content) {
     final lines = const LineSplitter().convert(content);
@@ -5484,9 +5776,7 @@ class _SiteImportPageState extends State<SiteImportPage> {
     ];
 
     for (final h in requiredHeaders) {
-      if (!headers.contains(h)) {
-        throw Exception("Missing column: $h");
-      }
+      if (!headers.contains(h)) throw Exception("Missing column: $h");
     }
 
     final List<SiteDetailModel> result = [];
@@ -5503,7 +5793,6 @@ class _SiteImportPageState extends State<SiteImportPage> {
       final fatOptical = _parseOptical(map['dB Loss At Splitter']);
       final atbOptical = _parseOptical(map['dB Loss At ATB']);
 
-      /// 🔥 Build JSON that matches YOUR model
       final json = <String, dynamic>{
         'circuit_id': map['Circuit ID'],
         'customer_name': map['Customer Name'],
@@ -5531,26 +5820,20 @@ class _SiteImportPageState extends State<SiteImportPage> {
     return result;
   }
 
-  /// Parse: -19.34dBm(1310),-19.74dBm(1490)
   (double?, double?) _parseOptical(String? value) {
     if (value == null) return (null, null);
-
     try {
       final parts = value.split(',');
-
       double? v1310;
       double? v1490;
-
       for (final p in parts) {
         final clean = p.replaceAll('dBm', '');
-
         if (clean.contains('(1310)')) {
           v1310 = double.tryParse(clean.replaceAll('(1310)', ''));
         } else if (clean.contains('(1490)')) {
           v1490 = double.tryParse(clean.replaceAll('(1490)', ''));
         }
       }
-
       return (v1310, v1490);
     } catch (_) {
       return (null, null);
@@ -5559,21 +5842,12 @@ class _SiteImportPageState extends State<SiteImportPage> {
 
   DateTime? _parseDate(String? value) {
     if (value == null) return null;
-
     try {
-      if (value.contains(',')) {
-        return DateTime.parse(_convertToIso(value));
-      }
-
+      if (value.contains(',')) return DateTime.parse(_convertToIso(value));
       final parts = value.split('/');
       if (parts.length == 3) {
-        return DateTime(
-          int.parse(parts[2]),
-          int.parse(parts[0]),
-          int.parse(parts[1]),
-        );
+        return DateTime(int.parse(parts[2]), int.parse(parts[0]), int.parse(parts[1]));
       }
-
       return DateTime.tryParse(value);
     } catch (_) {
       return null;
@@ -5582,30 +5856,55 @@ class _SiteImportPageState extends State<SiteImportPage> {
 
   String _convertToIso(String input) {
     final parts = input.split(',');
-
     final date = parts[0].trim().split('/');
     final time = parts[1].trim();
-
     final month = date[0].padLeft(2, '0');
     final day = date[1].padLeft(2, '0');
     final year = date[2];
-
     final isPM = time.contains('PM');
     final t = time.replaceAll(RegExp(r'AM|PM'), '').trim().split(':');
-
     int hour = int.parse(t[0]);
     final minute = t[1];
-
     if (isPM && hour != 12) hour += 12;
     if (!isPM && hour == 12) hour = 0;
-
     return "$year-$month-$day ${hour.toString().padLeft(2, '0')}:$minute:00";
   }
 
+  // ── Build ─────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
+    final hasSelection = _selectedIndexes.isNotEmpty;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Import TSV')),
+      appBar: AppBar(
+        title: hasSelection ? Text('${_selectedIndexes.length} selected') : const Text('Import TSV'),
+        actions: [
+          if (sites.isNotEmpty) ...[
+            TextButton(
+              onPressed: _toggleSelectAll,
+              child: Text(_allSelected ? 'Unselect All' : 'Select All'),
+            ),
+            if (hasSelection)
+              isCreating
+                  ? const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      child: Center(
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                    )
+                  : IconButton(
+                      tooltip: 'Create Sites',
+                      onPressed: _createSites,
+                      icon: const Icon(Icons.cloud_upload_outlined),
+                    ),
+          ],
+        ],
+      ),
       body: Column(
         children: [
           const SizedBox(height: 16),
@@ -5624,10 +5923,7 @@ class _SiteImportPageState extends State<SiteImportPage> {
           if (error != null)
             Padding(
               padding: const EdgeInsets.all(16),
-              child: Text(
-                error!,
-                style: const TextStyle(color: Colors.red),
-              ),
+              child: Text(error!, style: const TextStyle(color: Colors.red)),
             ),
 
           Expanded(
@@ -5635,8 +5931,13 @@ class _SiteImportPageState extends State<SiteImportPage> {
               itemCount: sites.length,
               itemBuilder: (context, index) {
                 final site = sites[index];
+                final isSelected = _selectedIndexes.contains(index);
 
                 return ExpansionTile(
+                  leading: Checkbox(
+                    value: isSelected,
+                    onChanged: (_) => _toggleSelect(index),
+                  ),
                   title: Text(site.circuitId),
                   trailing: IconButton(
                     onPressed: () {
@@ -5649,7 +5950,7 @@ class _SiteImportPageState extends State<SiteImportPage> {
                         ),
                       );
                     },
-                    icon: Icon(Icons.navigate_next_rounded),
+                    icon: const Icon(Icons.navigate_next_rounded),
                   ),
                   subtitle: Text(
                     "${site.customerName ?? '-'}\n"
@@ -5657,7 +5958,7 @@ class _SiteImportPageState extends State<SiteImportPage> {
                   ),
                   children: [
                     Padding(
-                      padding: EdgeInsetsGeometry.all(8),
+                      padding: const EdgeInsets.all(8),
                       child: Text(site.toJson().toString()),
                     ),
                   ],
@@ -5670,6 +5971,7 @@ class _SiteImportPageState extends State<SiteImportPage> {
     );
   }
 }
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -5733,15 +6035,13 @@ class _SiteCreatePageState extends State<SiteCreatePage> {
   final List<_PoleEntry> _poles = [];
 
   // ── Gallery ──────────────────────────────────────────────────────────────
-  // Keyed single-slot photos
   final Map<String, XFile?> _gallery = {};
-  // D4 accessories — dynamic list (0..*)
   final List<XFile> _d4Images = [];
 
-  // ── Image picker shared ───────────────────────────────────────────────────
+  // ── Image picker ─────────────────────────────────────────────────────────
 
   Future<XFile?> _pickImageFromSource() async {
-    final src = await showModalBottomSheet<ImageSource>(
+    final choice = await showModalBottomSheet<String>(
       context: context,
       builder: (_) => SafeArea(
         child: Column(
@@ -5750,19 +6050,80 @@ class _SiteCreatePageState extends State<SiteCreatePage> {
             ListTile(
               leading: const Icon(Icons.camera_alt),
               title: const Text('Camera'),
-              onTap: () => Navigator.pop(context, ImageSource.camera),
+              onTap: () => Navigator.pop(context, 'camera'),
             ),
             ListTile(
               leading: const Icon(Icons.photo_library),
               title: const Text('Gallery'),
-              onTap: () => Navigator.pop(context, ImageSource.gallery),
+              onTap: () => Navigator.pop(context, 'gallery'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.content_paste),
+              title: const Text('Paste from clipboard'),
+              onTap: () => Navigator.pop(context, 'paste'),
             ),
           ],
         ),
       ),
     );
-    if (src == null) return null;
+    if (choice == null) return null;
+    if (choice == 'paste') return _readClipboardImage();
+    final src = choice == 'camera' ? ImageSource.camera : ImageSource.gallery;
     return _picker.pickImage(source: src, imageQuality: 80);
+  }
+
+  /// Reads an image from the system clipboard using super_clipboard.
+  Future<XFile?> _readClipboardImage() async {
+    // final clipboard = SystemClipboard.instance;
+    // if (clipboard == null) {
+    //   if (mounted) {
+    //     ScaffoldMessenger.of(context).showSnackBar(
+    //       const SnackBar(content: Text('Clipboard not available on this platform.')),
+    //     );
+    //   }
+    //   return null;
+    // }
+
+    // final reader = await clipboard.read();
+
+    // for (final format in [Formats.png, Formats.jpeg, Formats.gif, Formats.webp]) {
+    //   if (reader.canProvide(format)) {
+    //     final completer = Completer<XFile?>();
+    //     reader.getFile(format, (file) async {
+    //       try {
+    //         final bytes = await file.readAll();
+    //         final ext = format == Formats.png
+    //             ? 'png'
+    //             : format == Formats.jpeg
+    //             ? 'jpg'
+    //             : format == Formats.gif
+    //             ? 'gif'
+    //             : 'webp';
+    //         final mime = format == Formats.png
+    //             ? 'image/png'
+    //             : format == Formats.jpeg
+    //             ? 'image/jpeg'
+    //             : format == Formats.gif
+    //             ? 'image/gif'
+    //             : 'image/webp';
+    //         completer.complete(
+    //           XFile.fromData(bytes, name: 'pasted.$ext', mimeType: mime),
+    //         );
+    //       } catch (_) {
+    //         completer.complete(null);
+    //       }
+    //     }, onError: (_) => completer.complete(null));
+    //     final result = await completer.future;
+    //     if (result != null) return result;
+    //   }
+    // }
+
+    // if (mounted) {
+    //   ScaffoldMessenger.of(context).showSnackBar(
+    //     const SnackBar(content: Text('No image found in clipboard.')),
+    //   );
+    // }
+    return null;
   }
 
   Future<void> _pickGalleryImage(String key) async {
@@ -5854,7 +6215,6 @@ class _SiteCreatePageState extends State<SiteCreatePage> {
     );
   }
 
-  // Gallery key-based convenience wrappers
   Widget _keyedPhotoSlot(String key, String label) {
     return _photoSlot(
       context: context,
@@ -6045,8 +6405,6 @@ class _SiteCreatePageState extends State<SiteCreatePage> {
     }
   }
 
-  // Maps a string key to the corresponding SiteGalleryModel field.
-  // D4 and anNode are handled separately (list upload & direct assign).
   void _setGalleryUrl(SiteGalleryModel g, String key, String? url) {
     switch (key) {
       case 'd1_1':
@@ -6118,7 +6476,6 @@ class _SiteCreatePageState extends State<SiteCreatePage> {
       case 'f6_2':
         g.f6_2 = url;
         break;
-      // an_node and d4 are handled outside this switch
     }
   }
 
@@ -6321,27 +6678,18 @@ class _SiteCreatePageState extends State<SiteCreatePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── AN Node ───────────────────────────────────────────────────────
           const _SubLabel('AN  Node photo'),
           _keyedPhotoSlot('an_node', 'AN Node'),
           const SizedBox(height: 12),
-
-          // ── D1 ────────────────────────────────────────────────────────────
           const _SubLabel('D1  FAT before installation'),
           _twoPhotoRow('d1_1', 'FAT Closed', 'd1_2', 'FAT Open'),
           const SizedBox(height: 12),
-
-          // ── D2 ────────────────────────────────────────────────────────────
           const _SubLabel('D2  FAT after installation'),
           _twoPhotoRow('d2_1', 'View 1', 'd2_2', 'View 2'),
           const SizedBox(height: 12),
-
-          // ── D3 ────────────────────────────────────────────────────────────
           const _SubLabel('D3  Cable label inside FAT'),
           _twoPhotoRow('d3_1', 'Label 1', 'd3_2', 'Label 2'),
           const SizedBox(height: 12),
-
-          // ── D4  (dynamic list — same pattern as poles) ────────────────────
           const _SubLabel('D4  Accessories (clamp / hook / buckle)'),
           ..._d4Images.asMap().entries.map(
             (e) => Padding(

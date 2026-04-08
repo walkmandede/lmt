@@ -21,7 +21,6 @@ dependencies:
   file_picker: ^8.1.2
   flutter_map_dragmarker: ^8.0.3
 
-
 dev_dependencies:
   flutter_test:
     sdk: flutter

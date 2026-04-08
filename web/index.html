@@ -34,5 +34,58 @@
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>
+  <script>
+    async function getPastedImageData() {
+      try {
+        const permission = await navigator.permissions.query({ name: "clipboard-read" });
+        if (permission.state === "denied") return null;
+
+        const items = await navigator.clipboard.read();
+
+        for (const item of items) {
+          // ✅ Case 1: Direct image blob (browser right-click copy)
+          for (const type of ['image/png', 'image/jpeg', 'image/webp', 'image/gif']) {
+            if (item.types.includes(type)) {
+              const blob = await item.getType(type);
+              return await blobToBase64(blob);
+            }
+          }
+
+          // ✅ Case 2: Telegram Desktop — puts image as HTML <img src="...">
+          if (item.types.includes('text/html')) {
+            const blob = await item.getType('text/html');
+            const html = await blob.text();
+            const match = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+            if (match && match[1]) {
+              try {
+                const response = await fetch(match[1]);
+                if (response.ok) {
+                  const imgBlob = await response.blob();
+                  if (imgBlob.type.startsWith('image/')) {
+                    return await blobToBase64(imgBlob);
+                  }
+                }
+              } catch (e) {
+                console.warn('Failed to fetch image from HTML clipboard URL:', e);
+              }
+            }
+          }
+        }
+        return null;
+      } catch (e) {
+        console.error('Clipboard read error:', e);
+        return null;
+      }
+    }
+
+    function blobToBase64(blob) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result); // "data:image/png;base64,..."
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    }
+  </script>
 </body>
 </html>

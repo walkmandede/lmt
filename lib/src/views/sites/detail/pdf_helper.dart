@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'package:lmt/src/views/sites/detail/site_detail_pdf_view_page.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:pdf/pdf.dart';
 import 'package:http/http.dart' as http;
@@ -55,7 +56,7 @@ pw.Widget pageHeader(Uint8List mpt, Uint8List ksgm) => pw.Row(
 );
 
 pw.Widget pageFooter(int pageNo) => pw.Row(
-  mainAxisAlignment: pw.MainAxisAlignment.center,
+  mainAxisAlignment: pw.MainAxisAlignment.end,
   children: [txt(pageNo.toString())],
 );
 
@@ -70,8 +71,8 @@ pw.Widget band(String label, String title, {PdfColor? color}) => pw.Table(
   children: [
     pw.TableRow(
       children: [
-        cell(label, bg: color ?? PdfColors.blue300),
-        cell(title, bg: color ?? PdfColors.blue300, align: pw.Alignment.centerLeft),
+        cell(label, bg: color ?? pdfColorBlue1),
+        cell(title, bg: color ?? pdfColorBlue1, align: pw.Alignment.centerLeft),
       ],
     ),
   ],
@@ -89,8 +90,8 @@ pw.Widget dataRow(String num, String label, String value) => pw.Table(
   children: [
     pw.TableRow(
       children: [
-        cell(num, bg: PdfColors.blue50),
-        cell(label, bg: PdfColors.blue50, align: pw.Alignment.centerLeft),
+        cell(num, bg: pdfColorBlue2),
+        cell(label, bg: pdfColorBlue2, align: pw.Alignment.centerLeft),
         cell(value, align: pw.Alignment.centerLeft),
       ],
     ),
@@ -110,11 +111,11 @@ pw.Widget dataRow2(String num, String label, String k1, String v1, String k2, St
   children: [
     pw.TableRow(
       children: [
-        cell(num, bg: PdfColors.blue50),
-        cell(label, bg: PdfColors.blue50, align: pw.Alignment.centerLeft),
-        cell(k1, bg: PdfColors.blue50, child: txt(k1, size: 10), align: pw.Alignment.centerLeft),
+        cell(num, bg: pdfColorBlue2),
+        cell(label, bg: pdfColorBlue2, align: pw.Alignment.centerLeft),
+        cell(k1, bg: pdfColorBlue2, child: txt(k1, size: 10), align: pw.Alignment.centerLeft),
         cell(v1, align: pw.Alignment.centerLeft),
-        cell(k2, bg: PdfColors.blue50, child: txt(k2, size: 10), align: pw.Alignment.centerLeft),
+        cell(k2, bg: pdfColorBlue2, child: txt(k2, size: 10), align: pw.Alignment.centerLeft),
         cell(v2, align: pw.Alignment.centerLeft),
       ],
     ),

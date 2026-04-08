@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -61,15 +62,13 @@ class _SiteCreatePageState extends State<SiteCreatePage> {
   final List<_PoleEntry> _poles = [];
 
   // ── Gallery ──────────────────────────────────────────────────────────────
-  // Keyed single-slot photos
   final Map<String, XFile?> _gallery = {};
-  // D4 accessories — dynamic list (0..*)
   final List<XFile> _d4Images = [];
 
-  // ── Image picker shared ───────────────────────────────────────────────────
+  // ── Image picker ─────────────────────────────────────────────────────────
 
   Future<XFile?> _pickImageFromSource() async {
-    final src = await showModalBottomSheet<ImageSource>(
+    final choice = await showModalBottomSheet<String>(
       context: context,
       builder: (_) => SafeArea(
         child: Column(
@@ -78,19 +77,80 @@ class _SiteCreatePageState extends State<SiteCreatePage> {
             ListTile(
               leading: const Icon(Icons.camera_alt),
               title: const Text('Camera'),
-              onTap: () => Navigator.pop(context, ImageSource.camera),
+              onTap: () => Navigator.pop(context, 'camera'),
             ),
             ListTile(
               leading: const Icon(Icons.photo_library),
               title: const Text('Gallery'),
-              onTap: () => Navigator.pop(context, ImageSource.gallery),
+              onTap: () => Navigator.pop(context, 'gallery'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.content_paste),
+              title: const Text('Paste from clipboard'),
+              onTap: () => Navigator.pop(context, 'paste'),
             ),
           ],
         ),
       ),
     );
-    if (src == null) return null;
+    if (choice == null) return null;
+    if (choice == 'paste') return _readClipboardImage();
+    final src = choice == 'camera' ? ImageSource.camera : ImageSource.gallery;
     return _picker.pickImage(source: src, imageQuality: 80);
+  }
+
+  /// Reads an image from the system clipboard using super_clipboard.
+  Future<XFile?> _readClipboardImage() async {
+    // final clipboard = SystemClipboard.instance;
+    // if (clipboard == null) {
+    //   if (mounted) {
+    //     ScaffoldMessenger.of(context).showSnackBar(
+    //       const SnackBar(content: Text('Clipboard not available on this platform.')),
+    //     );
+    //   }
+    //   return null;
+    // }
+
+    // final reader = await clipboard.read();
+
+    // for (final format in [Formats.png, Formats.jpeg, Formats.gif, Formats.webp]) {
+    //   if (reader.canProvide(format)) {
+    //     final completer = Completer<XFile?>();
+    //     reader.getFile(format, (file) async {
+    //       try {
+    //         final bytes = await file.readAll();
+    //         final ext = format == Formats.png
+    //             ? 'png'
+    //             : format == Formats.jpeg
+    //             ? 'jpg'
+    //             : format == Formats.gif
+    //             ? 'gif'
+    //             : 'webp';
+    //         final mime = format == Formats.png
+    //             ? 'image/png'
+    //             : format == Formats.jpeg
+    //             ? 'image/jpeg'
+    //             : format == Formats.gif
+    //             ? 'image/gif'
+    //             : 'image/webp';
+    //         completer.complete(
+    //           XFile.fromData(bytes, name: 'pasted.$ext', mimeType: mime),
+    //         );
+    //       } catch (_) {
+    //         completer.complete(null);
+    //       }
+    //     }, onError: (_) => completer.complete(null));
+    //     final result = await completer.future;
+    //     if (result != null) return result;
+    //   }
+    // }
+
+    // if (mounted) {
+    //   ScaffoldMessenger.of(context).showSnackBar(
+    //     const SnackBar(content: Text('No image found in clipboard.')),
+    //   );
+    // }
+    return null;
   }
 
   Future<void> _pickGalleryImage(String key) async {
@@ -182,7 +242,6 @@ class _SiteCreatePageState extends State<SiteCreatePage> {
     );
   }
 
-  // Gallery key-based convenience wrappers
   Widget _keyedPhotoSlot(String key, String label) {
     return _photoSlot(
       context: context,
@@ -373,8 +432,6 @@ class _SiteCreatePageState extends State<SiteCreatePage> {
     }
   }
 
-  // Maps a string key to the corresponding SiteGalleryModel field.
-  // D4 and anNode are handled separately (list upload & direct assign).
   void _setGalleryUrl(SiteGalleryModel g, String key, String? url) {
     switch (key) {
       case 'd1_1':
@@ -446,7 +503,6 @@ class _SiteCreatePageState extends State<SiteCreatePage> {
       case 'f6_2':
         g.f6_2 = url;
         break;
-      // an_node and d4 are handled outside this switch
     }
   }
 
@@ -649,27 +705,18 @@ class _SiteCreatePageState extends State<SiteCreatePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── AN Node ───────────────────────────────────────────────────────
           const _SubLabel('AN  Node photo'),
           _keyedPhotoSlot('an_node', 'AN Node'),
           const SizedBox(height: 12),
-
-          // ── D1 ────────────────────────────────────────────────────────────
           const _SubLabel('D1  FAT before installation'),
           _twoPhotoRow('d1_1', 'FAT Closed', 'd1_2', 'FAT Open'),
           const SizedBox(height: 12),
-
-          // ── D2 ────────────────────────────────────────────────────────────
           const _SubLabel('D2  FAT after installation'),
           _twoPhotoRow('d2_1', 'View 1', 'd2_2', 'View 2'),
           const SizedBox(height: 12),
-
-          // ── D3 ────────────────────────────────────────────────────────────
           const _SubLabel('D3  Cable label inside FAT'),
           _twoPhotoRow('d3_1', 'Label 1', 'd3_2', 'Label 2'),
           const SizedBox(height: 12),
-
-          // ── D4  (dynamic list — same pattern as poles) ────────────────────
           const _SubLabel('D4  Accessories (clamp / hook / buckle)'),
           ..._d4Images.asMap().entries.map(
             (e) => Padding(

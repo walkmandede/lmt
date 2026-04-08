@@ -13,6 +13,10 @@ import 'package:printing/printing.dart';
 // PDF generation — runs in background isolate via compute().
 // ---------------------------------------------------------------------------
 
+PdfColor pdfColorBlue1 = PdfColor.fromHex('#90abdd');
+PdfColor pdfColorBlue2 = PdfColor.fromHex('#dae3f3');
+PdfColor pdfColorGrey1 = PdfColor.fromHex('#d9d9d9');
+
 Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
   final doc = pw.Document(title: 'Site Detail Report', author: 'Galaxia Net');
 
@@ -42,7 +46,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
           children: [
             pageHeader(mpt, ksgm),
             pw.SizedBox(height: 16),
-            txt('Galaxia @ Net CO.,LTD'.toUpperCase(), size: 18, color: PdfColors.blue),
+            txt('Galaxia @ Net CO.,LTD'.toUpperCase(), size: 18, color: pdfColorBlue1),
             pw.SizedBox(height: 32),
             txt('MPT-KSGM FTTH Project'.toUpperCase(), size: 18),
             pw.SizedBox(height: 32),
@@ -126,7 +130,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
             dataRow('1', 'Circuit ID', circuitId),
             dataRow2('2', 'Location (Coordinates)', 'Lat', s('customerLat').formatDecimal(), 'Long', s('customerLng').formatDecimal()),
             dataRow('3', 'Work Order Date/Time', s('workOrderDateTime')),
-            dataRow('4', 'Activation/Relocated Date/Time', s('activationDateTime')),
+            dataRow('4', 'Activation/Relocated Date', DateTime.tryParse(s('activationDateTime'))?.toString().substring(0, 10) ?? '-'),
             pw.SizedBox(height: 16),
             band('B', 'Site/FAT information'),
             dataRow('1', 'Survey Result (Feasible)', s('surveyResultDateTime')),
@@ -162,7 +166,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
             pageHeader(mpt, ksgm),
             pw.SizedBox(height: 16),
             band('D', 'Onsite Installation Photo & Termination for FAT'),
-            band('I', 'Photos of FAT before installation', color: PdfColors.green200),
+            band('I', 'FAT photo & Accessories Photo', color: pdfColorGrey1),
             // D1:
             pw.Expanded(
               child: pw.Container(
@@ -215,6 +219,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                                       ],
                                     ),
                                   ),
+                                  pw.SizedBox(width: 10),
                                   pw.Expanded(
                                     child: pw.Column(
                                       children: [
@@ -279,6 +284,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                               child: pw.Row(
                                 children: [
                                   pw.Expanded(child: img('d2_1') == null ? pw.SizedBox.shrink() : pw.Image(img('d2_1')!)),
+                                  pw.SizedBox(width: 10),
                                   pw.Expanded(child: img('d2_2') == null ? pw.SizedBox.shrink() : pw.Image(img('d2_2')!)),
                                 ],
                               ),
@@ -311,7 +317,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
             pageHeader(mpt, ksgm),
             pw.SizedBox(height: 16),
             band('D', 'Onsite Installation Photo & Termination for FAT'),
-            band('II', 'FAT photo & Accessories Photo', color: PdfColors.blue50),
+            band('I', 'FAT photo & Accessories Photo', color: pdfColorGrey1),
             // D3: Cable label inside FAT — pair
             pw.Expanded(
               child: pw.Container(
@@ -357,7 +363,8 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                               child: pw.Row(
                                 children: [
                                   pw.Expanded(child: img('d3_1') == null ? pw.SizedBox.shrink() : pw.Image(img('d3_1')!)),
-                                  pw.Expanded(child: img('d3_1') == null ? pw.SizedBox.shrink() : pw.Image(img('d3_2')!)),
+                                  pw.SizedBox(width: 10),
+                                  pw.Expanded(child: img('d3_2') == null ? pw.SizedBox.shrink() : pw.Image(img('d3_2')!)),
                                 ],
                               ),
                             ),
@@ -414,7 +421,9 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                               child: pw.Row(
                                 children: [
                                   ...d4Bytes.map((d) {
-                                    return pw.Expanded(child: pw.Image(pw.MemoryImage(d)));
+                                    return pw.Expanded(
+                                      child: pw.Padding(padding: pw.EdgeInsets.only(right: 10), child: pw.Image(pw.MemoryImage(d))),
+                                    );
                                   }),
                                 ],
                               ),
@@ -447,7 +456,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
             pageHeader(mpt, ksgm),
             pw.SizedBox(height: 16),
             band('E', 'Onsite Installation Photo & Termination customer site'),
-            band('I', 'Drop cable photo and other facilities', color: PdfColors.blue50),
+            band('I', 'Drop cable photo and other facilities', color: pdfColorGrey1),
             // e1
             pw.Expanded(
               child: pw.Container(
@@ -490,7 +499,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                           children: [
                             txt('Photo of Outdoor Cable (Drop cable laid through route) Remark :Please take photo including FAT)'),
                             pw.Expanded(
-                              child: img('e1') == null ? pw.SizedBox.shrink() : pw.Image(img('e1')!),
+                              child: img('e1') == null ? pw.SizedBox.shrink() : pw.Center(child: pw.Image(img('e1')!)),
                             ),
                             txt('Whether there are any other fibers or not, please show/point out the related fiber clearly.'),
                           ],
@@ -543,7 +552,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                           children: [
                             txt('Photo of Customer Home entrance cable'),
                             pw.Expanded(
-                              child: img('e2') == null ? pw.SizedBox.shrink() : pw.Image(img('e2')!),
+                              child: img('e2') == null ? pw.SizedBox.shrink() : pw.Center(child: pw.Image(img('e2')!)),
                             ),
                           ],
                         ),
@@ -595,7 +604,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                           children: [
                             txt('Photo of Indoor Cable (Drop cable laid between customer entrance and ATB)'),
                             pw.Expanded(
-                              child: img('e3') == null ? pw.SizedBox.shrink() : pw.Image(img('e3')!),
+                              child: img('e3') == null ? pw.SizedBox.shrink() : pw.Center(child: pw.Image(img('e3')!)),
                             ),
                           ],
                         ),
@@ -670,6 +679,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                               child: pw.Row(
                                 children: [
                                   pw.Expanded(child: img('e4_1') == null ? pw.SizedBox.shrink() : pw.Image(img('e4_1')!)),
+                                  pw.SizedBox(width: 10),
                                   pw.Expanded(child: img('e4_2') == null ? pw.SizedBox.shrink() : pw.Image(img('e4_2')!)),
                                 ],
                               ),
@@ -724,7 +734,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                           children: [
                             txt('Photo of ATB'),
                             pw.Expanded(
-                              child: img('e5') == null ? pw.SizedBox.shrink() : pw.Image(img('e5')!),
+                              child: img('e5') == null ? pw.SizedBox.shrink() : pw.Center(child: pw.Image(img('e5')!)),
                             ),
                           ],
                         ),
@@ -847,13 +857,21 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                         child: pw.Column(
                           crossAxisAlignment: pw.CrossAxisAlignment.start,
                           children: [
-                            txt('Photo of Cable Coils(At customer side and FAT side)'),
+                            txt('Other Remark: ${s('cableDrumEnd')} - ${s('cableDrumStart')} = ${s('dropCableLengthInMeter')}m'),
                             pw.Expanded(
                               child: pw.Row(
                                 children: [
-                                  pw.Expanded(child: img('e6_1') == null ? pw.SizedBox.shrink() : pw.Image(img('e6_1')!)),
-                                  pw.Expanded(child: img('e6_2') == null ? pw.SizedBox.shrink() : pw.Image(img('e6_2')!)),
-                                  pw.Expanded(child: img('e6_3') == null ? pw.SizedBox.shrink() : pw.Image(img('e6_3')!)),
+                                  pw.Expanded(
+                                    child: img('e6_1') == null ? pw.SizedBox.shrink() : pw.AspectRatio(aspectRatio: 1, child: pw.Image(img('e6_1')!)),
+                                  ),
+                                  pw.SizedBox(width: 10),
+                                  pw.Expanded(
+                                    child: img('e6_2') == null ? pw.SizedBox.shrink() : pw.AspectRatio(aspectRatio: 1, child: pw.Image(img('e6_2')!)),
+                                  ),
+                                  pw.SizedBox(width: 10),
+                                  pw.Expanded(
+                                    child: img('e6_3') == null ? pw.SizedBox.shrink() : pw.AspectRatio(aspectRatio: 1, child: pw.Image(img('e6_3')!)),
+                                  ),
                                 ],
                               ),
                             ),
@@ -885,7 +903,8 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
             pageHeader(mpt, ksgm),
             pw.SizedBox(height: 16),
             band('F', 'ONT test and service test result'),
-            band('I', 'ONT information', color: PdfColors.blue50),
+            band('I', 'ONT information', color: pdfColorGrey1),
+            dataRow('1', 'ONT/SN number', s('ontSerialNumber')),
             // e1
             pw.Expanded(
               child: pw.Container(
@@ -928,7 +947,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                           children: [
                             txt('Photo of ONT'),
                             pw.Expanded(
-                              child: img('f1') == null ? pw.SizedBox.shrink() : pw.Image(img('f1')!),
+                              child: img('f1') == null ? pw.SizedBox.shrink() : pw.Center(child: pw.Image(img('f1')!)),
                             ),
                           ],
                         ),
@@ -980,7 +999,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                           children: [
                             txt('Photo of S/N Number of ONT'),
                             pw.Expanded(
-                              child: img('f2') == null ? pw.SizedBox.shrink() : pw.Image(img('f2')!),
+                              child: img('f2') == null ? pw.SizedBox.shrink() : pw.Center(child: pw.Image(img('f2')!)),
                             ),
                           ],
                         ),
@@ -1033,7 +1052,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                             txt('Photo of ONT installation environment'),
                             txt('(*) Do not put in places where are exposed to direct sunlight or extreme temperatures'),
                             pw.Expanded(
-                              child: img('f3') == null ? pw.SizedBox.shrink() : pw.Image(img('f3')!),
+                              child: img('f3') == null ? pw.SizedBox.shrink() : pw.Center(child: pw.Image(img('f3')!)),
                             ),
                           ],
                         ),
@@ -1063,7 +1082,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
             pageHeader(mpt, ksgm),
             pw.SizedBox(height: 16),
             band('F', 'ONT test and service test result'),
-            band('II', 'Service test result', color: PdfColors.blue50),
+            band('II', 'Service test result', color: pdfColorBlue2),
             // f4
             pw.Expanded(
               child: pw.Container(
@@ -1109,6 +1128,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                               child: pw.Row(
                                 children: [
                                   pw.Expanded(child: img('f4_1') == null ? pw.SizedBox.shrink() : pw.Image(img('f4_1')!)),
+                                  pw.SizedBox(width: 10),
                                   pw.Expanded(child: img('f4_2') == null ? pw.SizedBox.shrink() : pw.Image(img('f4_2')!)),
                                 ],
                               ),
@@ -1163,7 +1183,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                           children: [
                             txt('Internet Service test (Speed Test)'),
                             pw.Expanded(
-                              child: img('f5') == null ? pw.SizedBox.shrink() : pw.Image(img('f5')!),
+                              child: img('f5') == null ? pw.SizedBox.shrink() : pw.Center(child: pw.Image(img('f5')!)),
                             ),
                           ],
                         ),
@@ -1218,6 +1238,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                               child: pw.Row(
                                 children: [
                                   pw.Expanded(child: img('f6_1') == null ? pw.SizedBox.shrink() : pw.Image(img('f6_1')!)),
+                                  pw.SizedBox(width: 10),
                                   pw.Expanded(child: img('f6_2') == null ? pw.SizedBox.shrink() : pw.Image(img('f6_2')!)),
                                 ],
                               ),
@@ -1246,11 +1267,21 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
       header: (context) => pageHeader(mpt, ksgm),
       footer: (context) => pageFooter(context.pageNumber),
       build: (context) {
+        List rawPoles = [];
+        final remainder = poles.length % 4;
+        rawPoles = [
+          ...poles,
+          ...List.generate(
+            4 - remainder,
+            (index) => null,
+          ),
+        ];
+
         return [
           pw.Container(
             width: double.infinity,
             decoration: pw.BoxDecoration(
-              color: PdfColors.blue100,
+              color: pdfColorBlue2,
               border: pw.Border.all(
                 color: PdfColors.black,
               ),
@@ -1274,7 +1305,11 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                   flex: 2,
                   child: pw.Container(
                     width: double.infinity,
-                    decoration: pw.BoxDecoration(),
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border.all(
+                        color: PdfColors.black,
+                      ),
+                    ),
                     alignment: pw.Alignment.centerLeft,
                     child: pw.Padding(
                       padding: pw.EdgeInsets.all(8),
@@ -1286,11 +1321,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                   flex: 3,
                   child: pw.Container(
                     width: double.infinity,
-                    decoration: pw.BoxDecoration(
-                      border: pw.Border.all(
-                        color: PdfColors.black,
-                      ),
-                    ),
+
                     alignment: pw.Alignment.centerLeft,
                     child: pw.Padding(
                       padding: pw.EdgeInsets.all(8),
@@ -1364,11 +1395,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                   flex: 3,
                   child: pw.Container(
                     width: double.infinity,
-                    decoration: pw.BoxDecoration(
-                      border: pw.Border.all(
-                        color: PdfColors.black,
-                      ),
-                    ),
+
                     alignment: pw.Alignment.centerLeft,
                     child: pw.Padding(
                       padding: pw.EdgeInsets.all(8),
@@ -1415,7 +1442,8 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
           pw.GridView(
             crossAxisCount: 2,
             childAspectRatio: 6 / 5,
-            children: poles.map((pole) {
+            children: rawPoles.map((pole) {
+              final hasData = pole != null;
               return pw.Container(
                 width: double.infinity,
                 decoration: pw.BoxDecoration(
@@ -1475,7 +1503,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                                     ),
                                     child: pw.Padding(
                                       padding: pw.EdgeInsets.all(4),
-                                      child: txt('P_${(poles.indexOf(pole) + 1).toString().padLeft(3, '0')}', size: 10),
+                                      child: txt(!hasData ? '-' : 'P_${(poles.indexOf(pole) + 1).toString().padLeft(3, '0')}', size: 10),
                                     ),
                                   ),
                                 ),
@@ -1507,7 +1535,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                                     ),
                                     child: pw.Padding(
                                       padding: pw.EdgeInsets.all(4),
-                                      child: txt(pole['lat'].toString().substring(0, min(pole['lat'].toString().length, 7)), size: 10),
+                                      child: txt(!hasData ? '-' : pole['lat'].toString().substring(0, min(pole['lat'].toString().length, 7)), size: 10),
                                     ),
                                   ),
                                 ),
@@ -1539,7 +1567,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                                     ),
                                     child: pw.Padding(
                                       padding: pw.EdgeInsets.all(4),
-                                      child: txt(pole['lng'].toString().substring(0, min(pole['lng'].toString().length, 7)), size: 10),
+                                      child: txt(!hasData ? '-' : pole['lng'].toString().substring(0, min(pole['lng'].toString().length, 7)), size: 10),
                                     ),
                                   ),
                                 ),
@@ -1573,11 +1601,13 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                               ),
                             ),
                             pw.Expanded(
-                              child: pole['imageBytes'] == null
+                              child: !hasData
+                                  ? pw.SizedBox.shrink()
+                                  : pole['imageBytes'] == null
                                   ? pw.Center(child: txt('No Image', size: 10))
                                   : pw.Image(
                                       pw.MemoryImage(pole['imageBytes'] as Uint8List),
-                                      fit: pw.BoxFit.contain,
+                                      fit: pw.BoxFit.fill,
                                     ),
                             ),
                           ],
@@ -1685,6 +1715,8 @@ class _SiteDetailPdfViewPageState extends State<SiteDetailPdfViewPage> {
       'mapImage': widget.mapImage,
       // Text fields
       'circuitId': _sd.circuitId,
+      'cableDrumStart': _sd.cableDrumStart,
+      'cableDrumEnd': _sd.cableDrumEnd,
       'customerLat': _sd.customerLat?.toString(),
       'customerLng': _sd.customerLng?.toString(),
       'workOrderDateTime': _sd.workOrderDateTime?.toString().substring(0, 16),
@@ -1754,7 +1786,24 @@ class _SiteDetailPdfViewPageState extends State<SiteDetailPdfViewPage> {
         ],
       ),
       body: SizedBox.expand(
-        child: _isLoading ? _loadingView() : _pdfView(),
+        child: _isLoading
+            ? _loadingView()
+            : Column(
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Center(
+                          child: AspectRatio(
+                            aspectRatio: 7 / 10,
+                            child: _pdfView(),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
       ),
     );
   }

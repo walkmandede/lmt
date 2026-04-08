@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:lmt/core/constants/app_functions.dart';
 import 'package:lmt/core/repositories/site_repository.dart';
 import 'package:lmt/core/services/site_service.dart';
 import 'package:lmt/core/services/storage_service.dart';
@@ -63,12 +65,9 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
   final List<_PoleEntry> _poles = [];
 
   // ── Gallery ──────────────────────────────────────────────────────────────
-  // Existing URLs loaded from DB (shown when no new file picked)
   final Map<String, String?> _existingUrls = {};
-  // Newly picked local files (override existing on save)
   final Map<String, XFile?> _newFiles = {};
-
-  final List<XFile> _d4NewImages = []; // newly picked files
+  final List<XFile> _d4NewImages = [];
   final List<String> _d4ExistingUrls = [];
 
   // ── Load ─────────────────────────────────────────────────────────────────
@@ -83,7 +82,6 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
     final model = await _service.getSite(widget.circuitId);
     if (model == null || !mounted) return;
 
-    // A
     _circuitIdCtrl.text = model.circuitId;
     _customerNameCtrl.text = model.customerName ?? '';
     _lspNameCtrl.text = model.lspName ?? '';
@@ -91,8 +89,6 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
     _customerLngCtrl.text = model.customerLng?.toString() ?? '';
     _workOrderDate = model.workOrderDateTime;
     _activationDate = model.activationDateTime;
-
-    // B
     _surveyDate = model.surveyResultDateTime;
     _fatNameCtrl.text = model.fatName ?? '';
     _fatPortCtrl.text = model.fatPortNumber ?? '';
@@ -104,25 +100,19 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
     _optAtb1490Ctrl.text = model.opticalLevelAtbPort1490nm?.toString() ?? '';
     _dropCableCtrl.text = model.dropCableLengthInMeter ?? '';
     _rowIssueCtrl.text = model.rowIssue ?? '';
-
-    // Additional
     _ontSnCtrl.text = model.ontSnNumber ?? '';
     _splitterCtrl.text = model.splitterNo ?? '';
     _wifiSsidCtrl.text = model.wifiSsid ?? '';
     _msanCtrl.text = model.msan ?? '';
     _linkIdCtrl.text = model.linkId ?? '';
     _poleRangeCtrl.text = model.poleRange ?? '';
-
-    // G
     _checkAreaCtrl.text = model.checkArea ?? '';
     _conclusionCtrl.text = model.conclusionAndComments ?? '';
 
-    // Poles
     for (final p in model.poles ?? []) {
       _poles.add(_PoleEntry.fromModel(p));
     }
 
-    // Gallery existing URLs
     final g = model.gallery;
     if (g != null) {
       _existingUrls.addAll({
@@ -164,7 +154,7 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
   // ── Image picker ──────────────────────────────────────────────────────────
 
   Future<XFile?> _pickImageFromSource() async {
-    final src = await showModalBottomSheet<ImageSource>(
+    final choice = await showModalBottomSheet<String>(
       context: context,
       builder: (_) => SafeArea(
         child: Column(
@@ -173,19 +163,92 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
             ListTile(
               leading: const Icon(Icons.camera_alt),
               title: const Text('Camera'),
-              onTap: () => Navigator.pop(context, ImageSource.camera),
+              onTap: () => Navigator.pop(context, 'camera'),
             ),
             ListTile(
               leading: const Icon(Icons.photo_library),
               title: const Text('Gallery'),
-              onTap: () => Navigator.pop(context, ImageSource.gallery),
+              onTap: () => Navigator.pop(context, 'gallery'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.content_paste),
+              title: const Text('Paste from clipboard'),
+              onTap: () => Navigator.pop(context, 'paste'),
             ),
           ],
         ),
       ),
     );
-    if (src == null) return null;
+    if (choice == null) return null;
+    if (choice == 'paste') return _readClipboardImage();
+    final src = choice == 'camera' ? ImageSource.camera : ImageSource.gallery;
     return _picker.pickImage(source: src, imageQuality: 80);
+  }
+
+  /// Reads an image from the system clipboard using super_clipboard.
+  Future<XFile?> _readClipboardImage() async {
+    final bytes = await readClipboardImage();
+
+    if (bytes != null) {
+      return XFile.fromData(bytes);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No image in clipboard")),
+      );
+    }
+    //   final clipboard = SystemClipboard.instance;
+    //   if (clipboard == null) {
+    //     if (mounted) {
+    //       ScaffoldMessenger.of(context).showSnackBar(
+    //         const SnackBar(content: Text('Clipboard not available on this platform.')),
+    //       );
+    //     }
+    //     return null;
+    //   }
+
+    //   final reader = await clipboard.read();
+
+    //   superPrint(reader.items.first);
+    //   superPrint((await reader.items.first.getVirtualFileReceiver()).);
+
+    //   for (final format in [Formats.png, Formats.jpeg, Formats.gif, Formats.webp]) {
+    //     if (reader.canProvide(format)) {
+    //       final completer = Completer<XFile?>();
+    //       reader.getFile(format, (file) async {
+    //         try {
+    //           final bytes = await file.readAll();
+    //           final ext = format == Formats.png
+    //               ? 'png'
+    //               : format == Formats.jpeg
+    //               ? 'jpg'
+    //               : format == Formats.gif
+    //               ? 'gif'
+    //               : 'webp';
+    //           final mime = format == Formats.png
+    //               ? 'image/png'
+    //               : format == Formats.jpeg
+    //               ? 'image/jpeg'
+    //               : format == Formats.gif
+    //               ? 'image/gif'
+    //               : 'image/webp';
+    //           completer.complete(
+    //             XFile.fromData(bytes, name: 'pasted.$ext', mimeType: mime),
+    //           );
+    //         } catch (_) {
+    //           completer.complete(null);
+    //         }
+    //       }, onError: (_) => completer.complete(null));
+    //       final result = await completer.future;
+    //       if (result != null) return result;
+    //     }
+    //   }
+
+    //   if (mounted) {
+    //     ScaffoldMessenger.of(context).showSnackBar(
+    //       const SnackBar(content: Text('No image found in clipboard.')),
+    //     );
+    //   }
+    return null;
   }
 
   Future<void> _pickGalleryImage(String key) async {
@@ -202,9 +265,9 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
     final picked = await _pickImageFromSource();
     if (picked != null) setState(() => _d4NewImages.add(picked));
   }
+
   // ── Photo slot ────────────────────────────────────────────────────────────
 
-  /// Shows new local file if picked, falls back to existing URL, else empty slot.
   Widget _photoSlot({
     required BuildContext context,
     required XFile? newFile,
@@ -217,34 +280,16 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
     final hasExisting = existingUrl != null && existingUrl.isNotEmpty;
 
     Future<void> handleTap() async {
-      /// EMPTY → PICK IMAGE
       if (!hasNew && !hasExisting) {
         onTap();
         return;
       }
-
-      /// NEW LOCAL IMAGE → VIEWER
       if (hasNew) {
         final bytes = await newFile.readAsBytes();
-        if (context.mounted) {
-          openImageViewer(
-            context: context,
-            bytes: bytes,
-            title: label,
-          );
-        }
-
+        if (context.mounted) openImageViewer(context: context, bytes: bytes, title: label);
         return;
       }
-
-      /// EXISTING URL → VIEWER
-      if (hasExisting) {
-        openImageViewer(
-          context: context,
-          url: existingUrl,
-          title: label,
-        );
-      }
+      if (hasExisting) openImageViewer(context: context, url: existingUrl, title: label);
     }
 
     return GestureDetector(
@@ -269,30 +314,16 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-
-                    /// ✅ FIXED IMAGE DISPLAY
                     child: hasNew
                         ? FutureBuilder<Uint8List>(
                             future: newFile.readAsBytes(),
                             builder: (context, snap) {
-                              if (!snap.hasData) {
-                                return const Center(
-                                  child: CircularProgressIndicator(),
-                                );
-                              }
-                              return Image.memory(
-                                snap.data!,
-                                fit: BoxFit.contain,
-                              );
+                              if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+                              return Image.memory(snap.data!, fit: BoxFit.contain);
                             },
                           )
-                        : Image.network(
-                            existingUrl!,
-                            fit: BoxFit.contain,
-                          ),
+                        : Image.network(existingUrl!, fit: BoxFit.contain),
                   ),
-
-                  /// BADGE
                   Positioned(
                     top: 4,
                     left: 4,
@@ -304,16 +335,10 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
                       ),
                       child: Text(
                         hasNew ? 'NEW' : 'SAVED',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
-
-                  /// REMOVE BUTTON
                   Positioned(
                     top: 4,
                     right: 4,
@@ -336,10 +361,7 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
                   Text(
                     label,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey,
-                    ),
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                 ],
               ),
@@ -462,9 +484,8 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
         ..checkArea = _checkAreaCtrl.text.trim().nullIfEmpty
         ..conclusionAndComments = _conclusionCtrl.text.trim().nullIfEmpty;
 
-      // Build gallery: upload new files, keep existing URLs, clear removed ones
       final gallery = SiteGalleryModel(circuitId: circuitId);
-      final allKeys = {
+      const allKeys = {
         'an_node',
         'd1_1',
         'd1_2',
@@ -494,7 +515,6 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
       for (final key in allKeys) {
         final newFile = _newFiles[key];
         final existingUrl = _existingUrls[key];
-
         String? finalUrl;
         if (newFile != null) {
           finalUrl = await _storage.uploadImage(
@@ -503,14 +523,12 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
             folder: key,
           );
         } else {
-          finalUrl = existingUrl; // keep existing or null if removed
+          finalUrl = existingUrl;
         }
-
         _setGalleryUrl(gallery, key, finalUrl);
       }
-      final d4Urls = List<String>.from(_d4ExistingUrls);
 
-      // Upload new D4 images (offset index past existing ones)
+      final d4Urls = List<String>.from(_d4ExistingUrls);
       for (int i = 0; i < _d4NewImages.length; i++) {
         final url = await _storage.uploadImage(
           circuitId: circuitId,
@@ -522,13 +540,11 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
       gallery.d4 = d4Urls.isEmpty ? null : d4Urls;
       model.gallery = gallery;
 
-      // Poles: upload new pole images, keep existing URLs
       model.poles = await Future.wait(
         _poles.asMap().entries.map((e) async {
           final index = e.key;
           final p = e.value;
           String? imageUrl;
-
           if (p.newImage != null) {
             imageUrl = await _storage.uploadImage(
               circuitId: circuitId,
@@ -536,9 +552,8 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
               folder: 'pole_${(index + 1).toString().padLeft(3, '0')}',
             );
           } else {
-            imageUrl = p.existingImageUrl; // keep existing or null if removed
+            imageUrl = p.existingImageUrl;
           }
-
           return SitePoleModel(
             id: p.existingId,
             circuitId: circuitId,
@@ -645,11 +660,7 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
   Widget build(BuildContext context) {
     if (_loading) {
       return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(
-            color: Colors.grey,
-          ),
-        ),
+        body: Center(child: CircularProgressIndicator(color: Colors.grey)),
       );
     }
 
@@ -663,17 +674,11 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
               child: SizedBox(
                 width: 20,
                 height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.black,
-                ),
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
               ),
             )
           else
-            IconButton(
-              onPressed: _save,
-              icon: Icon(Icons.save),
-            ),
+            IconButton(onPressed: _save, icon: const Icon(Icons.save)),
         ],
       ),
       body: ListView(
@@ -698,7 +703,6 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
       title: 'A  Circuit ID Information',
       child: Column(
         children: [
-          // Circuit ID is read-only on update
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: TextField(
@@ -867,7 +871,6 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
 
   // ── D ─────────────────────────────────────────────────────────────────────
 
-  // 4. Replace _sectionD entirely
   Widget _sectionD() {
     return SectionCard(
       title: 'D  Onsite Installation – FAT',
@@ -887,7 +890,6 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
           _twoPhotoRow('d3_1', 'Label 1', 'd3_2', 'Label 2'),
           const SizedBox(height: 12),
           const _SubLabel('D4  Accessories (clamp / hook / buckle)'),
-          // Existing D4 URLs (from DB) that haven't been replaced
           ..._d4ExistingUrls.asMap().entries.map(
             (e) => Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -901,7 +903,6 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
               ),
             ),
           ),
-          // Newly picked D4 images
           ..._d4NewImages.asMap().entries.map(
             (e) => Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -1023,8 +1024,8 @@ class _PoleEntry {
   EnumPoleType? type;
   final latCtrl = TextEditingController();
   final lngCtrl = TextEditingController();
-  String? existingImageUrl; // URL from DB
-  XFile? newImage; // locally picked, not yet uploaded
+  String? existingImageUrl;
+  XFile? newImage;
 
   _PoleEntry();
 

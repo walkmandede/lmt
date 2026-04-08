@@ -1,3 +1,4 @@
+import 'package:lmt/core/constants/app_functions.dart';
 import 'package:lmt/src/models/site_detail_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -39,6 +40,41 @@ class SupabaseSiteService {
           )
           .range(from, to)
           .order('created_at', ascending: false),
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> listSitesByFliter({
+    int page = 0,
+    int limit = 20,
+    String? search,
+    String sortField = 'created_at',
+    bool sortAsc = false,
+  }) async {
+    final from = page * limit;
+    final to = from + limit - 1;
+
+    var query = client
+        .from('site_details')
+        .select(
+          'circuit_id, customer_name, lsp_name, created_at, survey_result, '
+          'site_gallery(an_node,d1_1,d1_2,d2_1,d2_2,d3_1,d3_2,d4,'
+          'e1,e2,e3,e4_1,e4_2,e5,e6_1,e6_2,e6_3,'
+          'f1,f2,f3,f4_1,f4_2,f5,f6_1,f6_2), '
+          'site_poles(id,image)',
+        );
+
+    superPrint(query);
+
+    // Search across circuit_id, customer_name, lsp_name
+    if (search != null && search.trim().isNotEmpty) {
+      final q = search.trim();
+      query = query.or(
+        'circuit_id.ilike.%$q%,customer_name.ilike.%$q%,lsp_name.ilike.%$q%',
+      );
+    }
+
+    return List<Map<String, dynamic>>.from(
+      await query.range(from, to).order(sortField, ascending: sortAsc),
     );
   }
 
