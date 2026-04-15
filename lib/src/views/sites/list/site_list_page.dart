@@ -299,7 +299,7 @@ class _SiteListPageState extends State<SiteListPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('FTTH Sites - v(1.0.5)'),
+        title: const Text('FTTH Sites - v(1.0.6)'),
         actions: [
           // Sort / filter button with active badge
           Stack(
