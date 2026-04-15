@@ -281,8 +281,35 @@ extension DecimalFormatter on String? {
     return value.toStringAsFixed(fractionDigits);
   }
 }
+import 'dart:typed_data';
+
+import 'package:lmt/core/constants/app_functions.dart';
 import 'package:lmt/src/models/site_detail_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'dart:js_interop';
+import 'dart:convert';
+
+@JS('listenForPaste')
+external JSPromise<JSAny?> _listenForPaste();
+
+/// Call this, then tell the user to press Ctrl+V / Cmd+V
+Future<Uint8List?> waitForPaste() async {
+  try {
+    final result = await _listenForPaste().toDart;
+    if (result == null) return null;
+
+    final dataUrl = (result as JSString).toDart;
+    // dataUrl = "data:image/jpeg;base64,/9j/4AAQ..."
+    final comma = dataUrl.indexOf(',');
+    if (comma == -1) return null;
+
+    return base64Decode(dataUrl.substring(comma + 1));
+  } catch (e) {
+    superPrint('Paste error: $e');
+    return null;
+  }
+}
 
 class SupabaseSiteService {
   final client = Supabase.instance.client;
@@ -322,6 +349,41 @@ class SupabaseSiteService {
           )
           .range(from, to)
           .order('created_at', ascending: false),
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> listSitesByFliter({
+    int page = 0,
+    int limit = 20,
+    String? search,
+    String sortField = 'created_at',
+    bool sortAsc = false,
+  }) async {
+    final from = page * limit;
+    final to = from + limit - 1;
+
+    var query = client
+        .from('site_details')
+        .select(
+          'circuit_id, customer_name, lsp_name, created_at, survey_result, '
+          'site_gallery(an_node,d1_1,d1_2,d2_1,d2_2,d3_1,d3_2,d4,'
+          'e1,e2,e3,e4_1,e4_2,e5,e6_1,e6_2,e6_3,'
+          'f1,f2,f3,f4_1,f4_2,f5,f6_1,f6_2), '
+          'site_poles(id,image)',
+        );
+
+    superPrint(query);
+
+    // Search across circuit_id, customer_name, lsp_name
+    if (search != null && search.trim().isNotEmpty) {
+      final q = search.trim();
+      query = query.or(
+        'circuit_id.ilike.%$q%,customer_name.ilike.%$q%,lsp_name.ilike.%$q%',
+      );
+    }
+
+    return List<Map<String, dynamic>>.from(
+      await query.range(from, to).order(sortField, ascending: sortAsc),
     );
   }
 
@@ -553,6 +615,7 @@ Future<void> main() async {
   runApp(MyApp());
 }
 import 'package:flutter/material.dart';
+import 'package:lmt/src/views/maps/map_test.dart';
 import 'package:lmt/src/views/sites/create/site_create_page.dart';
 import 'package:lmt/src/views/sites/detail/site_detail_page.dart';
 import 'package:lmt/src/views/sites/import/site_import_page.dart';
@@ -570,6 +633,7 @@ class MyApp extends StatelessWidget {
       routes: {
         '/': (_) => const SiteListPage(),
         '/create': (_) => const SiteCreatePage(),
+        '/map_page': (_) => const MapPage(),
       },
       theme: ThemeData(
         useMaterial3: false,
@@ -1045,6 +1109,59 @@ class SiteDetailModel {
       ..gallery = gallery ?? this.gallery;
   }
 }
+import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+
+class MapPage extends StatefulWidget {
+  const MapPage({super.key});
+
+  @override
+  State<MapPage> createState() => _MapPageState();
+}
+
+class _MapPageState extends State<MapPage> {
+  GoogleMapController? _controller;
+
+  static const LatLng _start = LatLng(16.8409, 96.1735); // Yangon
+  static const LatLng _end = LatLng(16.8661, 96.1951);
+
+  final Set<Marker> _markers = {
+    Marker(
+      markerId: const MarkerId('start'),
+      position: _start,
+      infoWindow: const InfoWindow(title: 'Site A'),
+    ),
+    Marker(
+      markerId: const MarkerId('end'),
+      position: _end,
+      infoWindow: const InfoWindow(title: 'Site B'),
+    ),
+  };
+
+  final Set<Polyline> _polylines = {
+    Polyline(
+      polylineId: const PolylineId('route'),
+      points: [_start, _end],
+      color: Colors.blue,
+      width: 4,
+    ),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: GoogleMap(
+        initialCameraPosition: const CameraPosition(
+          target: _start,
+          zoom: 13,
+        ),
+        markers: _markers,
+        polylines: _polylines,
+        onMapCreated: (controller) => _controller = controller,
+      ),
+    );
+  }
+}
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
@@ -1136,6 +1253,506 @@ class SectionCard extends StatelessWidget {
             const SizedBox(height: 12),
             child,
           ],
+        ),
+      ),
+    );
+  }
+}
+import 'dart:async';
+import 'dart:ui' as ui;
+
+import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart'
+    as gmaps
+    show GoogleMap, GoogleMapController, CameraPosition, LatLng, Marker, MarkerId, Polyline, PolylineId, BitmapDescriptor, CameraUpdate, LatLngBounds;
+import 'package:lmt/src/models/site_detail_model.dart';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AppMapWidget
+// Usage: AppMapWidget(width: 600, height: 400, site: siteDetailModel)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class SiteMapWidget extends StatefulWidget {
+  final double width;
+  final double height;
+  final SiteDetailModel site;
+  final void Function(gmaps.GoogleMapController gMapController)? onMapCreated;
+
+  const SiteMapWidget({
+    super.key,
+    required this.width,
+    required this.height,
+    required this.site,
+    required this.onMapCreated,
+  });
+
+  @override
+  State<SiteMapWidget> createState() => _SiteMapWidgetState();
+}
+
+class _SiteMapWidgetState extends State<SiteMapWidget> {
+  Completer<gmaps.GoogleMapController?> _controller = Completer<gmaps.GoogleMapController>();
+
+  Set<gmaps.Marker> _markers = {};
+  Set<gmaps.Polyline> _polylines = {};
+
+  // Screen-space positions for overlay widgets
+  Offset? _fatOffset;
+  Offset? _customerOffset;
+  Offset? _distanceOffset;
+
+  // Hide overlays while camera is moving to avoid jitter
+  bool _cameraMoving = false;
+  Timer? _idleTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _buildMarkersAndPolylines();
+  }
+
+  @override
+  void dispose() {
+    _idleTimer?.cancel();
+    super.dispose();
+  }
+
+  // ── Marker & polyline setup ─────────────────────────────────────────────────
+
+  Future<void> _buildMarkersAndPolylines() async {
+    final site = widget.site;
+    final markers = <gmaps.Marker>{};
+    final polylinePoints = <gmaps.LatLng>[];
+
+    // FAT — green location pin (standard Google Maps default green)
+    if (site.fatLat != null && site.fatLng != null) {
+      markers.add(
+        gmaps.Marker(
+          markerId: const gmaps.MarkerId('fat'),
+          position: gmaps.LatLng(site.fatLat!, site.fatLng!),
+          icon: gmaps.BitmapDescriptor.defaultMarkerWithHue(gmaps.BitmapDescriptor.hueGreen),
+          anchor: const Offset(0.5, 1.0),
+        ),
+      );
+      polylinePoints.add(gmaps.LatLng(site.fatLat!, site.fatLng!));
+    }
+
+    // Poles — drawn colored circles
+    int poleIndex = 0;
+    for (final pole in (site.poles ?? [])) {
+      if (!pole.hasLocations) continue;
+      final color = _poleColor(pole.enumPoleType);
+      final icon = await _drawPoleMarker(color);
+      markers.add(
+        gmaps.Marker(
+          markerId: gmaps.MarkerId('pole_$poleIndex'),
+          position: gmaps.LatLng(pole.lat!, pole.lng!),
+          icon: icon,
+          anchor: const Offset(0.5, 0.5),
+        ),
+      );
+      polylinePoints.add(gmaps.LatLng(pole.lat!, pole.lng!));
+      poleIndex++;
+    }
+
+    // Customer — green home circle
+    if (site.customerLat != null && site.customerLng != null) {
+      final icon = await _drawHomeMarker();
+      markers.add(
+        gmaps.Marker(
+          markerId: const gmaps.MarkerId('customer'),
+          position: gmaps.LatLng(site.customerLat!, site.customerLng!),
+          icon: icon,
+          anchor: const Offset(0.5, 0.5),
+        ),
+      );
+      polylinePoints.add(gmaps.LatLng(site.customerLat!, site.customerLng!));
+    }
+
+    final polylines = <gmaps.Polyline>{};
+    if (polylinePoints.length > 1) {
+      polylines.add(
+        gmaps.Polyline(
+          polylineId: const gmaps.PolylineId('route'),
+          points: polylinePoints,
+          color: const Color(0xFF2196F3),
+          width: 3,
+        ),
+      );
+    }
+
+    if (mounted) {
+      setState(() {
+        _markers = markers;
+        _polylines = polylines;
+      });
+    }
+  }
+
+  // ── Custom marker drawing ───────────────────────────────────────────────────
+
+  Color _poleColor(EnumPoleType? type) {
+    switch (type) {
+      case EnumPoleType.epc:
+        return const Color(0xFFDD2222);
+      case EnumPoleType.mpt:
+        return const Color(0xFF1a7a3a);
+      case EnumPoleType.other:
+        return const Color(0xFF00AADD);
+      default:
+        return Colors.grey;
+    }
+  }
+
+  /// Colored circle with a horizontal black stripe — matches EPC/MPT/Other icons
+  Future<gmaps.BitmapDescriptor> _drawPoleMarker(Color color) async {
+    const double size = 36;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, size, size));
+
+    // Fill circle
+    canvas.drawCircle(
+      const Offset(size / 2, size / 2),
+      size / 2,
+      Paint()..color = color,
+    );
+    // Black border
+    canvas.drawCircle(
+      const Offset(size / 2, size / 2),
+      size / 2 - 1.5,
+      Paint()
+        ..color = Colors.black
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5,
+    );
+    // Horizontal stripe
+    canvas.drawLine(
+      const Offset(5, size / 2),
+      const Offset(size - 5, size / 2),
+      Paint()
+        ..color = Colors.black
+        ..strokeWidth = 3.5
+        ..strokeCap = StrokeCap.round,
+    );
+
+    final picture = recorder.endRecording();
+    final img = await picture.toImage(size.toInt(), size.toInt());
+    final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
+    return gmaps.BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
+  }
+
+  /// Dark-green circle with a small white house shape inside
+  Future<gmaps.BitmapDescriptor> _drawHomeMarker() async {
+    const double size = 38;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, size, size));
+
+    // Fill circle
+    canvas.drawCircle(
+      const Offset(size / 2, size / 2),
+      size / 2,
+      Paint()..color = const Color(0xFF1a7a3a),
+    );
+    // Black border
+    canvas.drawCircle(
+      const Offset(size / 2, size / 2),
+      size / 2 - 1.5,
+      Paint()
+        ..color = Colors.black
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
+
+    // Simple house shape (roof triangle + body rect)
+    final whitePaint = Paint()..color = Colors.white;
+    final cx = size / 2;
+
+    // Roof triangle
+    final roofPath = Path()
+      ..moveTo(cx, 9)
+      ..lineTo(cx - 9, 19)
+      ..lineTo(cx + 9, 19)
+      ..close();
+    canvas.drawPath(roofPath, whitePaint);
+
+    // Body rectangle
+    canvas.drawRect(const Rect.fromLTWH(size / 2 - 7, 19, 14, 10), whitePaint);
+
+    // Door
+    canvas.drawRect(
+      Rect.fromLTWH(cx - 2.5, 23, 5, 6),
+      Paint()..color = const Color(0xFF1a7a3a),
+    );
+
+    final picture = recorder.endRecording();
+    final img = await picture.toImage(size.toInt(), size.toInt());
+    final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
+    return gmaps.BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
+  }
+
+  // ── Overlay position calculation ────────────────────────────────────────────
+
+  Future<void> _updateOverlayPositions() async {
+    final ctrl = await _controller.future;
+    if (ctrl == null) return;
+
+    final site = widget.site;
+
+    Offset? fatOff;
+    Offset? custOff;
+    Offset? distOff;
+
+    if (site.fatLat != null && site.fatLng != null) {
+      final sc = await ctrl.getScreenCoordinate(gmaps.LatLng(site.fatLat!, site.fatLng!));
+      fatOff = Offset(sc.x.toDouble(), sc.y.toDouble());
+    }
+
+    if (site.customerLat != null && site.customerLng != null) {
+      final sc = await ctrl.getScreenCoordinate(gmaps.LatLng(site.customerLat!, site.customerLng!));
+      custOff = Offset(sc.x.toDouble(), sc.y.toDouble());
+    }
+
+    // Distance label at the midpoint of the polyline
+    final allPoints = <gmaps.LatLng>[];
+    if (site.fatLat != null && site.fatLng != null) {
+      allPoints.add(gmaps.LatLng(site.fatLat!, site.fatLng!));
+    }
+    for (final p in (site.poles ?? [])) {
+      if (p.hasLocations) allPoints.add(gmaps.LatLng(p.lat!, p.lng!));
+    }
+    if (site.customerLat != null && site.customerLng != null) {
+      allPoints.add(gmaps.LatLng(site.customerLat!, site.customerLng!));
+    }
+    if (allPoints.length >= 2 && site.dropCableLengthInMeter != null) {
+      final midPoint = allPoints[allPoints.length ~/ 2];
+      final sc = await ctrl.getScreenCoordinate(midPoint);
+      distOff = Offset(sc.x.toDouble(), sc.y.toDouble());
+    }
+
+    if (mounted) {
+      setState(() {
+        _fatOffset = fatOff;
+        _customerOffset = custOff;
+        _distanceOffset = distOff;
+      });
+    }
+  }
+
+  void _onCameraMove(_) {
+    if (!_cameraMoving) {
+      setState(() => _cameraMoving = true);
+    }
+    _idleTimer?.cancel();
+  }
+
+  void _onCameraIdle() {
+    _idleTimer = Timer(const Duration(milliseconds: 100), () async {
+      await _updateOverlayPositions();
+      if (mounted) setState(() => _cameraMoving = false);
+    });
+  }
+
+  // ── Initial camera bounds ───────────────────────────────────────────────────
+
+  gmaps.LatLng _initialCenter() {
+    final site = widget.site;
+    if (site.fatLat != null && site.fatLng != null) {
+      return gmaps.LatLng(site.fatLat!, site.fatLng!);
+    }
+    if (site.customerLat != null && site.customerLng != null) {
+      return gmaps.LatLng(site.customerLat!, site.customerLng!);
+    }
+    return const gmaps.LatLng(16.8409, 96.1735); // default Yangon
+  }
+
+  /// After map is ready, fit camera to show all points
+  Future<void> _fitBounds() async {
+    final ctrl = await _controller.future;
+    if (ctrl == null) return;
+
+    final site = widget.site;
+    final lats = <double>[];
+    final lngs = <double>[];
+
+    if (site.fatLat != null) lats.add(site.fatLat!);
+    if (site.fatLng != null) lngs.add(site.fatLng!);
+    if (site.customerLat != null) lats.add(site.customerLat!);
+    if (site.customerLng != null) lngs.add(site.customerLng!);
+    for (final p in (site.poles ?? [])) {
+      if (p.lat != null) lats.add(p.lat!);
+      if (p.lng != null) lngs.add(p.lng!);
+    }
+
+    if (lats.length < 2) return;
+
+    lats.sort();
+    lngs.sort();
+
+    final bounds = gmaps.LatLngBounds(
+      southwest: gmaps.LatLng(lats.first, lngs.first),
+      northeast: gmaps.LatLng(lats.last, lngs.last),
+    );
+
+    await ctrl.animateCamera(
+      gmaps.CameraUpdate.newLatLngBounds(bounds, 60),
+    );
+  }
+
+  // ── Build ───────────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    final site = widget.site;
+    final showOverlays = !_cameraMoving;
+
+    return SizedBox(
+      width: widget.width,
+      height: widget.height,
+      child: ClipRect(
+        child: Column(
+          children: [
+            Expanded(
+              flex: 2,
+              child: Stack(
+                children: [
+                  // ── Google Map ──────────────────────────────────────────────────
+                  gmaps.GoogleMap(
+                    initialCameraPosition: gmaps.CameraPosition(
+                      target: _initialCenter(),
+                      zoom: 15,
+                    ),
+                    markers: _markers,
+                    polylines: _polylines,
+                    myLocationButtonEnabled: false,
+                    zoomControlsEnabled: true,
+                    onMapCreated: (ctrl) async {
+                      if (widget.onMapCreated != null) {
+                        widget.onMapCreated!(ctrl);
+                      }
+
+                      _controller.complete(ctrl);
+                      await _fitBounds();
+                      await _updateOverlayPositions();
+                    },
+                    onCameraMove: _onCameraMove,
+                    onCameraIdle: _onCameraIdle,
+                  ),
+
+                  // ── FAT info box ────────────────────────────────────────────────
+                  if (showOverlays && _fatOffset != null && site.fatLat != null && site.fatLng != null)
+                    Positioned(
+                      left: _fatOffset!.dx + 12,
+                      top: _fatOffset!.dy - 70,
+                      child: IgnorePointer(
+                        child: _InfoBox(
+                          lat: site.fatLat!,
+                          lng: site.fatLng!,
+                          label: site.fatName,
+                        ),
+                      ),
+                    ),
+
+                  // ── Customer info box ───────────────────────────────────────────
+                  if (showOverlays && _customerOffset != null && site.customerLat != null && site.customerLng != null)
+                    Positioned(
+                      left: _customerOffset!.dx + 12,
+                      top: _customerOffset!.dy - 70,
+                      child: IgnorePointer(
+                        child: _InfoBox(
+                          lat: site.customerLat!,
+                          lng: site.customerLng!,
+                          label: site.circuitId,
+                        ),
+                      ),
+                    ),
+
+                  // ── Distance label ──────────────────────────────────────────────
+                  if (showOverlays && _distanceOffset != null && site.dropCableLengthInMeter != null)
+                    Positioned(
+                      left: _distanceOffset!.dx - 25,
+                      top: _distanceOffset!.dy - 36,
+                      child: IgnorePointer(
+                        child: _DistanceLabel(
+                          label: _formatDistance(site.dropCableLengthInMeter!),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: const Placeholder(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatDistance(String raw) {
+    final trimmed = raw.trim();
+    return trimmed.toLowerCase().endsWith('m') ? trimmed : '${trimmed}m';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Overlay widgets
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _InfoBox extends StatelessWidget {
+  final double lat;
+  final double lng;
+  final String? label;
+
+  const _InfoBox({required this.lat, required this.lng, this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: Colors.black, width: 1.5),
+      ),
+      child: DefaultTextStyle(
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          color: Colors.black,
+          height: 1.5,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('N : ${lat.toStringAsFixed(7)}'),
+            Text('E : ${lng.toStringAsFixed(7)}'),
+            if (label != null && label!.isNotEmpty) Text(label!),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DistanceLabel extends StatelessWidget {
+  final String label;
+  const _DistanceLabel({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: Colors.black, width: 2),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+          color: Colors.black,
         ),
       ),
     );
@@ -1296,7 +1913,7 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
 
   // ── Image picker ──────────────────────────────────────────────────────────
 
-  Future<XFile?> _pickImageFromSource() async {
+  Future<XFile?> _pickImageFromSource(BuildContext context) async {
     final choice = await showModalBottomSheet<String>(
       context: context,
       builder: (_) => SafeArea(
@@ -1323,89 +1940,48 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
       ),
     );
     if (choice == null) return null;
-    if (choice == 'paste') return _readClipboardImage();
+    if (context.mounted) {
+      if (choice == 'paste') return _readClipboardImage(context);
+    }
     final src = choice == 'camera' ? ImageSource.camera : ImageSource.gallery;
     return _picker.pickImage(source: src, imageQuality: 80);
   }
 
   /// Reads an image from the system clipboard using super_clipboard.
-  Future<XFile?> _readClipboardImage() async {
-    final bytes = await readClipboardImage();
+  Future<XFile?> _readClipboardImage(BuildContext context) async {
+    superPrint('start');
+    final bytes = await waitForPaste();
+    superPrint(bytes);
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    }
 
     if (bytes != null) {
       return XFile.fromData(bytes);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("No image in clipboard")),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No image found. Try copying again.')),
+        );
+      }
+
+      return null;
     }
-    //   final clipboard = SystemClipboard.instance;
-    //   if (clipboard == null) {
-    //     if (mounted) {
-    //       ScaffoldMessenger.of(context).showSnackBar(
-    //         const SnackBar(content: Text('Clipboard not available on this platform.')),
-    //       );
-    //     }
-    //     return null;
-    //   }
-
-    //   final reader = await clipboard.read();
-
-    //   superPrint(reader.items.first);
-    //   superPrint((await reader.items.first.getVirtualFileReceiver()).);
-
-    //   for (final format in [Formats.png, Formats.jpeg, Formats.gif, Formats.webp]) {
-    //     if (reader.canProvide(format)) {
-    //       final completer = Completer<XFile?>();
-    //       reader.getFile(format, (file) async {
-    //         try {
-    //           final bytes = await file.readAll();
-    //           final ext = format == Formats.png
-    //               ? 'png'
-    //               : format == Formats.jpeg
-    //               ? 'jpg'
-    //               : format == Formats.gif
-    //               ? 'gif'
-    //               : 'webp';
-    //           final mime = format == Formats.png
-    //               ? 'image/png'
-    //               : format == Formats.jpeg
-    //               ? 'image/jpeg'
-    //               : format == Formats.gif
-    //               ? 'image/gif'
-    //               : 'image/webp';
-    //           completer.complete(
-    //             XFile.fromData(bytes, name: 'pasted.$ext', mimeType: mime),
-    //           );
-    //         } catch (_) {
-    //           completer.complete(null);
-    //         }
-    //       }, onError: (_) => completer.complete(null));
-    //       final result = await completer.future;
-    //       if (result != null) return result;
-    //     }
-    //   }
-
-    //   if (mounted) {
-    //     ScaffoldMessenger.of(context).showSnackBar(
-    //       const SnackBar(content: Text('No image found in clipboard.')),
-    //     );
-    //   }
-    return null;
   }
 
   Future<void> _pickGalleryImage(String key) async {
-    final picked = await _pickImageFromSource();
+    final picked = await _pickImageFromSource(context);
     if (picked != null) setState(() => _newFiles[key] = picked);
   }
 
   Future<void> _pickPoleImage(int index) async {
-    final picked = await _pickImageFromSource();
+    final picked = await _pickImageFromSource(context);
     if (picked != null) setState(() => _poles[index].newImage = picked);
   }
 
   Future<void> _pickD4Image() async {
-    final picked = await _pickImageFromSource();
+    final picked = await _pickImageFromSource(context);
     if (picked != null) setState(() => _d4NewImages.add(picked));
   }
 
@@ -2203,19 +2779,86 @@ class _SubLabel extends StatelessWidget {
 extension _StringExt on String {
   String? get nullIfEmpty => isEmpty ? null : this;
 }
-import 'dart:math';
+import 'dart:async';
+import 'dart:convert';
+import 'dart:js_interop';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:lmt/core/constants/app_functions.dart';
 import 'package:lmt/core/services/site_service.dart';
 import 'package:lmt/src/models/site_detail_model.dart';
 import 'package:lmt/src/views/_widgets/image_viewer_page.dart';
 import 'package:lmt/src/views/_widgets/section_card.dart';
+import 'package:lmt/src/views/_widgets/site_map_widget.dart';
 import 'package:lmt/src/views/sites/detail/site_detail_pdf_view_page.dart';
 import 'package:lmt/src/views/sites/detail/site_map_edit_page.dart';
+import 'package:lmt/src/views/sites/export/site_pdf_page.dart';
 import 'package:screenshot/screenshot.dart';
+import 'package:http/http.dart' as http;
+
+String _buildStaticMapUrl({
+  required SiteDetailModel site,
+  int width = 600,
+  int height = 400,
+  String apiKey = 'YOUR_API_KEY',
+}) {
+  final poles = site.poles ?? [];
+  final params = StringBuffer();
+
+  params.write('https://maps.googleapis.com/maps/api/staticmap?');
+  params.write('size=${width}x$height');
+  params.write('&maptype=roadmap');
+
+  // FAT marker — green
+  if (site.fatLat != null) {
+    params.write('&markers=color:green|${site.fatLat},${site.fatLng}');
+  }
+
+  // Customer marker — also green (home)
+  if (site.customerLat != null) {
+    params.write('&markers=color:green|${site.customerLat},${site.customerLng}');
+  }
+
+  // Pole markers by type
+  for (final p in poles.where((e) => e.hasLocations)) {
+    final color = switch (p.enumPoleType) {
+      EnumPoleType.epc => 'red',
+      EnumPoleType.mpt => 'green',
+      EnumPoleType.other => 'blue',
+      _ => 'gray',
+    };
+    params.write('&markers=color:$color|${p.lat},${p.lng}');
+  }
+
+  // Polyline through all points
+  final polylinePoints = [
+    if (site.fatLat != null) '${site.fatLat},${site.fatLng}',
+    ...poles.where((e) => e.hasLocations).map((p) => '${p.lat},${p.lng}'),
+    if (site.customerLat != null) '${site.customerLat},${site.customerLng}',
+  ];
+  if (polylinePoints.length > 1) {
+    params.write('&path=color:0x2196F3FF|weight:3|${polylinePoints.join('|')}');
+  }
+
+  params.write('&key=$apiKey');
+  return params.toString();
+}
+
+Future<Uint8List?> _fetchStaticMapImage(SiteDetailModel site) async {
+  final url = _buildStaticMapUrl(site: site, apiKey: 'AIzaSyCiDbggAf3yFr-r9IxcIDUOKieHMs7mPIE');
+  superPrint(url);
+  try {
+    final response = await http.get(Uri.parse(url));
+    if (response.statusCode == 200) return response.bodyBytes;
+  } catch (e) {
+    debugPrint('Static map fetch failed: $e');
+  }
+  return null;
+}
 
 class SiteDetailPage extends StatefulWidget {
   final String circuitId;
@@ -2234,7 +2877,8 @@ class SiteDetailPage extends StatefulWidget {
 class _SiteDetailPageState extends State<SiteDetailPage> {
   final _service = SupabaseSiteService();
   SiteDetailModel? _site;
-  final ScreenshotController _screenshotController = ScreenshotController();
+  // final ScreenshotController _screenshotController = ScreenshotController();
+  Completer<GoogleMapController> _googleMapController = Completer<GoogleMapController>();
 
   @override
   void initState() {
@@ -2267,7 +2911,12 @@ class _SiteDetailPageState extends State<SiteDetailPage> {
                 IconButton(
                   icon: Icon(Icons.print),
                   onPressed: () async {
-                    final mapImg = await _screenshotController.capture();
+                    // final mapCtrl = await _googleMapController.future;
+                    // superPrint(mapCtrl.mapId);
+                    // final mapImg = await (await _googleMapController.future).takeSnapshot();
+
+                    final mapImg = await _fetchStaticMapImage(site);
+
                     await Future.delayed(const Duration(milliseconds: 200));
                     superPrint(mapImg?.length);
                     if (context.mounted) {
@@ -2283,6 +2932,30 @@ class _SiteDetailPageState extends State<SiteDetailPage> {
                         ),
                       );
                     }
+                  },
+                ),
+                IconButton(
+                  icon: Icon(Icons.picture_as_pdf),
+                  onPressed: () async {
+                    // final mapImg = await _screenshotController.capture();
+                    // final mapCtrl = await _googleMapController.future;
+                    // superPrint(mapCtrl.mapId);
+                    // final mapImg = await (await _googleMapController.future).takeSnapshot();
+                    // await Future.delayed(const Duration(milliseconds: 200));
+                    // superPrint(mapImg?.length);
+                    // if (context.mounted) {
+                    //   Navigator.push(
+                    //     context,
+                    //     MaterialPageRoute(
+                    //       builder: (context) {
+                    //         return SitePdfPage(
+                    //           siteDetailModel: _site!,
+                    //           mapImage: mapImg!,
+                    //         );
+                    //       },
+                    //     ),
+                    //   );
+                    // }
                   },
                 ),
                 IconButton(
@@ -2344,522 +3017,529 @@ class _SiteDetailPageState extends State<SiteDetailPage> {
             ),
           ),
           width: size.height * 0.6,
-          height: size.height * 0.5,
-          child: Screenshot(
-            controller: _screenshotController,
-            child: LayoutBuilder(
-              builder: (a1, c1) {
-                return Column(
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: FlutterMap(
-                        options: MapOptions(
-                          initialCameraFit: !site.hasLocations
-                              ? null
-                              : CameraFit.bounds(bounds: LatLngBounds(site.fatLatLng!, site.customerLatLng!), padding: EdgeInsets.all(32)),
-                        ),
-                        children: [
-                          TileLayer(
-                            urlTemplate: 'https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png',
-                            userAgentPackageName: 'LMT',
-                          ),
-                          PolylineLayer(
-                            polylines: [
-                              if (site.canDrawPolyLine)
-                                Polyline(
-                                  color: Colors.blue,
-                                  pattern: StrokePattern.solid(),
-                                  strokeWidth: 2,
-                                  points: [
-                                    if (site.customerLatLng != null) site.customerLatLng!,
-                                    ...(poles.where((e) => e.hasLocations)).map((p) {
-                                      return LatLng(p.lat!, p.lng!);
-                                    }),
-                                    if (site.fatLat != null) site.fatLatLng!,
-                                  ],
-                                ),
-                            ],
-                          ),
+          height: size.height * 0.72,
+          child: LayoutBuilder(
+            builder: (a1, c1) {
+              return SiteMapWidget(
+                width: double.infinity,
+                height: double.infinity,
+                onMapCreated: (gMapController) {
+                  _googleMapController.complete(gMapController);
+                  superPrint('created ${_googleMapController.toString()}');
+                },
+                site: site,
+              );
+              // return Column(
+              //   children: [
+              //     Expanded(
+              //       flex: 2,
+              //       child: FlutterMap(
+              //         options: MapOptions(
+              //           initialCameraFit: !site.hasLocations
+              //               ? null
+              //               : CameraFit.bounds(bounds: LatLngBounds(site.fatLatLng!, site.customerLatLng!), padding: EdgeInsets.all(32)),
+              //         ),
+              //         children: [
+              //           TileLayer(
+              //             urlTemplate: 'https://mt0.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+              //             // urlTemplate: 'https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png',
+              //             userAgentPackageName: 'LMT',
+              //           ),
+              //           PolylineLayer(
+              //             polylines: [
+              //               if (site.canDrawPolyLine)
+              //                 Polyline(
+              //                   color: Colors.blue,
+              //                   pattern: StrokePattern.solid(),
+              //                   strokeWidth: 2,
+              //                   points: [
+              //                     if (site.customerLatLng != null) site.customerLatLng!,
+              //                     ...(poles.where((e) => e.hasLocations)).map((p) {
+              //                       return LatLng(p.lat!, p.lng!);
+              //                     }),
+              //                     if (site.fatLat != null) site.fatLatLng!,
+              //                   ],
+              //                 ),
+              //             ],
+              //           ),
 
-                          MarkerLayer(
-                            markers: [
-                              //cus pin
-                              if (site.customerLatLng != null)
-                                Marker(
-                                  width: 50,
-                                  height: 30,
-                                  point: site.customerLatLng!,
-                                  alignment: Alignment.topCenter,
-                                  child: Column(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          site.circuitId,
-                                          style: TextStyle(
-                                            fontSize: 5,
-                                            foreground: Paint()
-                                              ..style = PaintingStyle.stroke
-                                              ..strokeWidth = 0.8
-                                              ..color = Colors.black,
-                                          ),
-                                        ),
-                                      ),
-                                      SizedBox(
-                                        width: 15,
-                                        height: 15,
-                                        child: Card(
-                                          margin: EdgeInsets.zero,
-                                          elevation: 0,
-                                          shape: CircleBorder(),
-                                          color: Colors.green,
-                                          child: Icon(
-                                            Icons.home,
-                                            color: Colors.white,
-                                            size: 12,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              //cus info
-                              if (site.customerLatLng != null)
-                                Marker(
-                                  width: 80,
-                                  height: 40,
-                                  point: site.customerLatLng!,
-                                  alignment: Alignment.bottomCenter,
-                                  child: DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      border: Border.all(),
-                                      color: Colors.white.withAlpha((0.7 * 255).toInt()),
-                                    ),
-                                    child: SizedBox.expand(
-                                      child: LayoutBuilder(
-                                        builder: (a1, c1) {
-                                          return Padding(
-                                            padding: EdgeInsets.symmetric(
-                                              horizontal: c1.maxWidth * 0.05,
-                                              vertical: c1.maxHeight * 0.05,
-                                            ),
-                                            child: Column(
-                                              children: [
-                                                Expanded(
-                                                  child: FittedBox(child: Text('N: ${_site?.customerLatLabel ?? '-'}')),
-                                                ),
-                                                Expanded(
-                                                  child: FittedBox(child: Text('E: ${_site?.customerLngLabel ?? '-'}')),
-                                                ),
-                                                Expanded(
-                                                  child: FittedBox(
-                                                    alignment: Alignment.center,
-                                                    child: Text(_site?.circuitId ?? ''),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              //fatPin
-                              if (site.fatLatLng != null)
-                                Marker(
-                                  width: 50,
-                                  height: 30,
-                                  point: site.fatLatLng!,
-                                  alignment: Alignment.topCenter,
-                                  child: Column(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          site.fatName ?? '-',
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            foreground: Paint()
-                                              ..style = PaintingStyle.stroke
-                                              ..strokeWidth = 0.8
-                                              ..color = Colors.black,
-                                          ),
-                                        ),
-                                      ),
-                                      SizedBox(
-                                        width: 15,
-                                        height: 15,
-                                        child: Icon(
-                                          Icons.location_on_rounded,
-                                          color: Colors.green,
-                                          size: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              //fat info
-                              if (site.fatLatLng != null)
-                                Marker(
-                                  width: 80,
-                                  height: 40,
-                                  point: site.fatLatLng!,
-                                  alignment: Alignment.bottomCenter,
-                                  child: DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      border: Border.all(),
-                                      color: Colors.white.withAlpha((0.7 * 255).toInt()),
-                                    ),
-                                    child: SizedBox.expand(
-                                      child: LayoutBuilder(
-                                        builder: (a1, c1) {
-                                          return Padding(
-                                            padding: EdgeInsets.symmetric(
-                                              horizontal: c1.maxWidth * 0.05,
-                                              vertical: c1.maxHeight * 0.05,
-                                            ),
-                                            child: Column(
-                                              children: [
-                                                Expanded(
-                                                  child: FittedBox(
-                                                    alignment: Alignment.center,
-                                                    child: Text('Lat: ${_site?.fatLatLabel ?? '-'}'),
-                                                  ),
-                                                ),
-                                                Expanded(
-                                                  child: FittedBox(
-                                                    alignment: Alignment.center,
-                                                    child: Text('Lat: ${_site?.fatLngLabel ?? '-'}'),
-                                                  ),
-                                                ),
-                                                Expanded(
-                                                  child: FittedBox(
-                                                    alignment: Alignment.center,
-                                                    child: Text(_site?.fatName ?? ''),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              //cable marker
-                              Marker(
-                                width: 50,
-                                height: 35,
-                                point: site.hasPole
-                                    ? LatLng(poles.first.lat ?? 0, poles.first.lng ?? 0)
-                                    : AppFunctions.getMidPointSimple(
-                                        site.customerLatLng ?? LatLng(0, 0),
-                                        site.fatLatLng ?? LatLng(0, 0),
-                                      ),
-                                alignment: Alignment.bottomCenter,
-                                child: Padding(
-                                  padding: EdgeInsets.only(
-                                    top: 15,
-                                  ),
-                                  child: DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withAlpha((0.7 * 255).toInt()),
-                                    ),
-                                    child: SizedBox.expand(
-                                      child: LayoutBuilder(
-                                        builder: (a1, c1) {
-                                          return Center(
-                                            child: Text('${site.dropCableLengthInMeter ?? 0}'),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
+              //           MarkerLayer(
+              //             markers: [
+              //               //cus pin
+              //               if (site.customerLatLng != null)
+              //                 Marker(
+              //                   width: 50,
+              //                   height: 30,
+              //                   point: site.customerLatLng!,
+              //                   alignment: Alignment.topCenter,
+              //                   child: Column(
+              //                     children: [
+              //                       Expanded(
+              //                         child: Text(
+              //                           site.circuitId,
+              //                           style: TextStyle(
+              //                             fontSize: 5,
+              //                             foreground: Paint()
+              //                               ..style = PaintingStyle.stroke
+              //                               ..strokeWidth = 0.8
+              //                               ..color = Colors.black,
+              //                           ),
+              //                         ),
+              //                       ),
+              //                       SizedBox(
+              //                         width: 15,
+              //                         height: 15,
+              //                         child: Card(
+              //                           margin: EdgeInsets.zero,
+              //                           elevation: 0,
+              //                           shape: CircleBorder(),
+              //                           color: Colors.green,
+              //                           child: Icon(
+              //                             Icons.home,
+              //                             color: Colors.white,
+              //                             size: 12,
+              //                           ),
+              //                         ),
+              //                       ),
+              //                     ],
+              //                   ),
+              //                 ),
+              //               //cus info
+              //               if (site.customerLatLng != null)
+              //                 Marker(
+              //                   width: 80,
+              //                   height: 40,
+              //                   point: site.customerLatLng!,
+              //                   alignment: Alignment.bottomCenter,
+              //                   child: DecoratedBox(
+              //                     decoration: BoxDecoration(
+              //                       border: Border.all(),
+              //                       color: Colors.white.withAlpha((0.7 * 255).toInt()),
+              //                     ),
+              //                     child: SizedBox.expand(
+              //                       child: LayoutBuilder(
+              //                         builder: (a1, c1) {
+              //                           return Padding(
+              //                             padding: EdgeInsets.symmetric(
+              //                               horizontal: c1.maxWidth * 0.05,
+              //                               vertical: c1.maxHeight * 0.05,
+              //                             ),
+              //                             child: Column(
+              //                               children: [
+              //                                 Expanded(
+              //                                   child: FittedBox(child: Text('N: ${_site?.customerLatLabel ?? '-'}')),
+              //                                 ),
+              //                                 Expanded(
+              //                                   child: FittedBox(child: Text('E: ${_site?.customerLngLabel ?? '-'}')),
+              //                                 ),
+              //                                 Expanded(
+              //                                   child: FittedBox(
+              //                                     alignment: Alignment.center,
+              //                                     child: Text(_site?.circuitId ?? ''),
+              //                                   ),
+              //                                 ),
+              //                               ],
+              //                             ),
+              //                           );
+              //                         },
+              //                       ),
+              //                     ),
+              //                   ),
+              //                 ),
+              //               //fatPin
+              //               if (site.fatLatLng != null)
+              //                 Marker(
+              //                   width: 50,
+              //                   height: 30,
+              //                   point: site.fatLatLng!,
+              //                   alignment: Alignment.topCenter,
+              //                   child: Column(
+              //                     children: [
+              //                       Expanded(
+              //                         child: Text(
+              //                           site.fatName ?? '-',
+              //                           style: TextStyle(
+              //                             fontSize: 10,
+              //                             foreground: Paint()
+              //                               ..style = PaintingStyle.stroke
+              //                               ..strokeWidth = 0.8
+              //                               ..color = Colors.black,
+              //                           ),
+              //                         ),
+              //                       ),
+              //                       SizedBox(
+              //                         width: 15,
+              //                         height: 15,
+              //                         child: Icon(
+              //                           Icons.location_on_rounded,
+              //                           color: Colors.green,
+              //                           size: 12,
+              //                         ),
+              //                       ),
+              //                     ],
+              //                   ),
+              //                 ),
+              //               //fat info
+              //               if (site.fatLatLng != null)
+              //                 Marker(
+              //                   width: 80,
+              //                   height: 40,
+              //                   point: site.fatLatLng!,
+              //                   alignment: Alignment.bottomCenter,
+              //                   child: DecoratedBox(
+              //                     decoration: BoxDecoration(
+              //                       border: Border.all(),
+              //                       color: Colors.white.withAlpha((0.7 * 255).toInt()),
+              //                     ),
+              //                     child: SizedBox.expand(
+              //                       child: LayoutBuilder(
+              //                         builder: (a1, c1) {
+              //                           return Padding(
+              //                             padding: EdgeInsets.symmetric(
+              //                               horizontal: c1.maxWidth * 0.05,
+              //                               vertical: c1.maxHeight * 0.05,
+              //                             ),
+              //                             child: Column(
+              //                               children: [
+              //                                 Expanded(
+              //                                   child: FittedBox(
+              //                                     alignment: Alignment.center,
+              //                                     child: Text('Lat: ${_site?.fatLatLabel ?? '-'}'),
+              //                                   ),
+              //                                 ),
+              //                                 Expanded(
+              //                                   child: FittedBox(
+              //                                     alignment: Alignment.center,
+              //                                     child: Text('Lat: ${_site?.fatLngLabel ?? '-'}'),
+              //                                   ),
+              //                                 ),
+              //                                 Expanded(
+              //                                   child: FittedBox(
+              //                                     alignment: Alignment.center,
+              //                                     child: Text(_site?.fatName ?? ''),
+              //                                   ),
+              //                                 ),
+              //                               ],
+              //                             ),
+              //                           );
+              //                         },
+              //                       ),
+              //                     ),
+              //                   ),
+              //                 ),
+              //               //cable marker
+              //               Marker(
+              //                 width: 50,
+              //                 height: 35,
+              //                 point: site.hasPole
+              //                     ? LatLng(poles.first.lat ?? 0, poles.first.lng ?? 0)
+              //                     : AppFunctions.getMidPointSimple(
+              //                         site.customerLatLng ?? LatLng(0, 0),
+              //                         site.fatLatLng ?? LatLng(0, 0),
+              //                       ),
+              //                 alignment: Alignment.bottomCenter,
+              //                 child: Padding(
+              //                   padding: EdgeInsets.only(
+              //                     top: 15,
+              //                   ),
+              //                   child: DecoratedBox(
+              //                     decoration: BoxDecoration(
+              //                       color: Colors.white.withAlpha((0.7 * 255).toInt()),
+              //                     ),
+              //                     child: SizedBox.expand(
+              //                       child: LayoutBuilder(
+              //                         builder: (a1, c1) {
+              //                           return Center(
+              //                             child: Text('${site.dropCableLengthInMeter ?? 0}'),
+              //                           );
+              //                         },
+              //                       ),
+              //                     ),
+              //                   ),
+              //                 ),
+              //               ),
 
-                              ...(site.poles ?? []).map((p) {
-                                Color color = Colors.black;
-                                if (p.enumPoleType != null) {
-                                  switch (p.enumPoleType) {
-                                    case null:
-                                      color = Colors.black;
-                                    case EnumPoleType.epc:
-                                      color = Colors.red;
-                                    case EnumPoleType.mpt:
-                                      color = Colors.green;
-                                    case EnumPoleType.other:
-                                      color = Colors.blue;
-                                  }
-                                }
-                                return Marker(
-                                  width: 25,
-                                  height: 25,
-                                  point: LatLng(p.lat ?? 0, p.lng ?? 0),
-                                  alignment: Alignment.center,
-                                  child: Card(
-                                    elevation: 0,
-                                    shape: CircleBorder(),
-                                    color: color,
-                                    child: Center(
-                                      child: Container(
-                                        height: 3,
-                                        width: 35,
-                                        color: Colors.black,
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              }),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Expanded(
-                            flex: 3,
-                            child: Table(
-                              border: TableBorder.all(color: Colors.black.withAlpha((0.6 * 255).toInt())),
-                              columnWidths: {
-                                0: FlexColumnWidth(1),
-                                1: FlexColumnWidth(3),
-                                2: FlexColumnWidth(4),
-                                3: FlexColumnWidth(2),
-                                4: FlexColumnWidth(3),
-                              },
-                              children: [
-                                TableRow(
-                                  decoration: BoxDecoration(color: Colors.lightBlue.withAlpha((0.9 * 255).toInt())),
-                                  children: [
-                                    Center(
-                                      child: Text(
-                                        'No',
-                                        style: TextStyle(color: Colors.black),
-                                      ),
-                                    ),
-                                    Center(
-                                      child: Text(
-                                        'Outline',
-                                        style: TextStyle(color: Colors.black),
-                                      ),
-                                    ),
-                                    Center(
-                                      child: FittedBox(
-                                        child: Text(
-                                          'Description',
-                                          style: TextStyle(color: Colors.black),
-                                        ),
-                                      ),
-                                    ),
-                                    Center(
-                                      child: Text(
-                                        'Unit',
-                                        style: TextStyle(color: Colors.black),
-                                      ),
-                                    ),
-                                    Center(
-                                      child: Text(
-                                        'Qty',
-                                        style: TextStyle(color: Colors.black),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                TableRow(
-                                  decoration: BoxDecoration(color: Colors.white.withAlpha((0.9 * 255).toInt())),
-                                  children: [
-                                    Center(
-                                      child: Text('1'),
-                                    ),
-                                    Center(
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(vertical: 8),
-                                        child: Container(
-                                          height: 2,
-                                          width: 20,
-                                          decoration: BoxDecoration(color: Colors.blue),
-                                        ),
-                                      ),
-                                    ),
-                                    Center(
-                                      child: Padding(
-                                        padding: EdgeInsets.symmetric(horizontal: 4),
-                                        child: Text(
-                                          'Drop Cable Length',
-                                          style: TextStyle(color: Colors.black, fontSize: 12),
-                                        ),
-                                      ),
-                                    ),
-                                    Center(
-                                      child: Text(
-                                        'Meter',
-                                        style: TextStyle(color: Colors.black),
-                                      ),
-                                    ),
-                                    Center(
-                                      child: Text(
-                                        _site?.dropCableLengthInMeter ?? '-',
-                                        style: TextStyle(color: Colors.black),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                TableRow(
-                                  decoration: BoxDecoration(color: Colors.white.withAlpha((0.9 * 255).toInt())),
-                                  children: [
-                                    Center(
-                                      child: Text('2'),
-                                    ),
-                                    Center(
-                                      child: SizedBox(
-                                        width: 25,
-                                        height: 25,
-                                        child: Card(
-                                          elevation: 0,
-                                          shape: CircleBorder(),
-                                          color: Colors.blue,
-                                          child: Center(
-                                            child: Container(
-                                              height: 3,
-                                              width: 35,
-                                              color: Colors.black,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    Center(
-                                      child: Padding(
-                                        padding: EdgeInsets.symmetric(horizontal: 4),
-                                        child: Text(
-                                          'Other Pole',
-                                          style: TextStyle(color: Colors.black),
-                                        ),
-                                      ),
-                                    ),
-                                    Center(
-                                      child: Text(
-                                        'Pcs',
-                                        style: TextStyle(color: Colors.black),
-                                      ),
-                                    ),
-                                    Center(
-                                      child: Text(
-                                        poles.where((p) => p.enumPoleType == EnumPoleType.other).length.toString(),
-                                        style: TextStyle(color: Colors.black),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                TableRow(
-                                  decoration: BoxDecoration(color: Colors.white.withAlpha((0.9 * 255).toInt())),
-                                  children: [
-                                    Center(
-                                      child: Text('3'),
-                                    ),
-                                    Center(
-                                      child: SizedBox(
-                                        width: 25,
-                                        height: 25,
-                                        child: Card(
-                                          elevation: 0,
-                                          shape: CircleBorder(),
-                                          color: Colors.red,
-                                          child: Center(
-                                            child: Container(
-                                              height: 3,
-                                              width: 35,
-                                              color: Colors.black,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    Center(
-                                      child: Padding(
-                                        padding: EdgeInsets.symmetric(horizontal: 4),
-                                        child: Text(
-                                          'EPC Pole',
-                                          style: TextStyle(color: Colors.black),
-                                        ),
-                                      ),
-                                    ),
-                                    Center(
-                                      child: Text(
-                                        'Pcs',
-                                        style: TextStyle(color: Colors.black),
-                                      ),
-                                    ),
-                                    Center(
-                                      child: Text(
-                                        poles.where((p) => p.enumPoleType == EnumPoleType.epc).length.toString(),
-                                        style: TextStyle(color: Colors.black),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+              //               ...(site.poles ?? []).map((p) {
+              //                 Color color = Colors.black;
+              //                 if (p.enumPoleType != null) {
+              //                   switch (p.enumPoleType) {
+              //                     case null:
+              //                       color = Colors.black;
+              //                     case EnumPoleType.epc:
+              //                       color = Colors.red;
+              //                     case EnumPoleType.mpt:
+              //                       color = Colors.green;
+              //                     case EnumPoleType.other:
+              //                       color = Colors.blue;
+              //                   }
+              //                 }
+              //                 return Marker(
+              //                   width: 25,
+              //                   height: 25,
+              //                   point: LatLng(p.lat ?? 0, p.lng ?? 0),
+              //                   alignment: Alignment.center,
+              //                   child: Card(
+              //                     elevation: 0,
+              //                     shape: CircleBorder(),
+              //                     color: color,
+              //                     child: Center(
+              //                       child: Container(
+              //                         height: 3,
+              //                         width: 35,
+              //                         color: Colors.black,
+              //                       ),
+              //                     ),
+              //                   ),
+              //                 );
+              //               }),
+              //             ],
+              //           ),
+              //         ],
+              //       ),
+              //     ),
+              //     SizedBox(
+              //       child: Row(
+              //         crossAxisAlignment: CrossAxisAlignment.end,
+              //         children: [
+              //           Expanded(
+              //             flex: 3,
+              //             child: Table(
+              //               border: TableBorder.all(color: Colors.black.withAlpha((0.6 * 255).toInt())),
+              //               columnWidths: {
+              //                 0: FlexColumnWidth(1),
+              //                 1: FlexColumnWidth(3),
+              //                 2: FlexColumnWidth(4),
+              //                 3: FlexColumnWidth(2),
+              //                 4: FlexColumnWidth(3),
+              //               },
+              //               children: [
+              //                 TableRow(
+              //                   decoration: BoxDecoration(color: Colors.lightBlue.withAlpha((0.9 * 255).toInt())),
+              //                   children: [
+              //                     Center(
+              //                       child: Text(
+              //                         'No',
+              //                         style: TextStyle(color: Colors.black),
+              //                       ),
+              //                     ),
+              //                     Center(
+              //                       child: Text(
+              //                         'Outline',
+              //                         style: TextStyle(color: Colors.black),
+              //                       ),
+              //                     ),
+              //                     Center(
+              //                       child: FittedBox(
+              //                         child: Text(
+              //                           'Description',
+              //                           style: TextStyle(color: Colors.black),
+              //                         ),
+              //                       ),
+              //                     ),
+              //                     Center(
+              //                       child: Text(
+              //                         'Unit',
+              //                         style: TextStyle(color: Colors.black),
+              //                       ),
+              //                     ),
+              //                     Center(
+              //                       child: Text(
+              //                         'Qty',
+              //                         style: TextStyle(color: Colors.black),
+              //                       ),
+              //                     ),
+              //                   ],
+              //                 ),
+              //                 TableRow(
+              //                   decoration: BoxDecoration(color: Colors.white.withAlpha((0.9 * 255).toInt())),
+              //                   children: [
+              //                     Center(
+              //                       child: Text('1'),
+              //                     ),
+              //                     Center(
+              //                       child: Padding(
+              //                         padding: const EdgeInsets.symmetric(vertical: 8),
+              //                         child: Container(
+              //                           height: 2,
+              //                           width: 20,
+              //                           decoration: BoxDecoration(color: Colors.blue),
+              //                         ),
+              //                       ),
+              //                     ),
+              //                     Center(
+              //                       child: Padding(
+              //                         padding: EdgeInsets.symmetric(horizontal: 4),
+              //                         child: Text(
+              //                           'Drop Cable Length',
+              //                           style: TextStyle(color: Colors.black, fontSize: 12),
+              //                         ),
+              //                       ),
+              //                     ),
+              //                     Center(
+              //                       child: Text(
+              //                         'Meter',
+              //                         style: TextStyle(color: Colors.black),
+              //                       ),
+              //                     ),
+              //                     Center(
+              //                       child: Text(
+              //                         _site?.dropCableLengthInMeter ?? '-',
+              //                         style: TextStyle(color: Colors.black),
+              //                       ),
+              //                     ),
+              //                   ],
+              //                 ),
+              //                 TableRow(
+              //                   decoration: BoxDecoration(color: Colors.white.withAlpha((0.9 * 255).toInt())),
+              //                   children: [
+              //                     Center(
+              //                       child: Text('2'),
+              //                     ),
+              //                     Center(
+              //                       child: SizedBox(
+              //                         width: 25,
+              //                         height: 25,
+              //                         child: Card(
+              //                           elevation: 0,
+              //                           shape: CircleBorder(),
+              //                           color: Colors.blue,
+              //                           child: Center(
+              //                             child: Container(
+              //                               height: 3,
+              //                               width: 35,
+              //                               color: Colors.black,
+              //                             ),
+              //                           ),
+              //                         ),
+              //                       ),
+              //                     ),
+              //                     Center(
+              //                       child: Padding(
+              //                         padding: EdgeInsets.symmetric(horizontal: 4),
+              //                         child: Text(
+              //                           'Other Pole',
+              //                           style: TextStyle(color: Colors.black),
+              //                         ),
+              //                       ),
+              //                     ),
+              //                     Center(
+              //                       child: Text(
+              //                         'Pcs',
+              //                         style: TextStyle(color: Colors.black),
+              //                       ),
+              //                     ),
+              //                     Center(
+              //                       child: Text(
+              //                         poles.where((p) => p.enumPoleType == EnumPoleType.other).length.toString(),
+              //                         style: TextStyle(color: Colors.black),
+              //                       ),
+              //                     ),
+              //                   ],
+              //                 ),
+              //                 TableRow(
+              //                   decoration: BoxDecoration(color: Colors.white.withAlpha((0.9 * 255).toInt())),
+              //                   children: [
+              //                     Center(
+              //                       child: Text('3'),
+              //                     ),
+              //                     Center(
+              //                       child: SizedBox(
+              //                         width: 25,
+              //                         height: 25,
+              //                         child: Card(
+              //                           elevation: 0,
+              //                           shape: CircleBorder(),
+              //                           color: Colors.red,
+              //                           child: Center(
+              //                             child: Container(
+              //                               height: 3,
+              //                               width: 35,
+              //                               color: Colors.black,
+              //                             ),
+              //                           ),
+              //                         ),
+              //                       ),
+              //                     ),
+              //                     Center(
+              //                       child: Padding(
+              //                         padding: EdgeInsets.symmetric(horizontal: 4),
+              //                         child: Text(
+              //                           'EPC Pole',
+              //                           style: TextStyle(color: Colors.black),
+              //                         ),
+              //                       ),
+              //                     ),
+              //                     Center(
+              //                       child: Text(
+              //                         'Pcs',
+              //                         style: TextStyle(color: Colors.black),
+              //                       ),
+              //                     ),
+              //                     Center(
+              //                       child: Text(
+              //                         poles.where((p) => p.enumPoleType == EnumPoleType.epc).length.toString(),
+              //                         style: TextStyle(color: Colors.black),
+              //                       ),
+              //                     ),
+              //                   ],
+              //                 ),
 
-                                TableRow(
-                                  decoration: BoxDecoration(color: Colors.white.withAlpha((0.9 * 255).toInt())),
-                                  children: [
-                                    Center(
-                                      child: Text('4'),
-                                    ),
-                                    Center(
-                                      child: SizedBox(
-                                        width: 25,
-                                        height: 25,
-                                        child: Card(
-                                          elevation: 0,
-                                          shape: CircleBorder(),
-                                          color: Colors.green,
-                                          child: Center(
-                                            child: Container(
-                                              height: 3,
-                                              width: 35,
-                                              color: Colors.black,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    Center(
-                                      child: Padding(
-                                        padding: EdgeInsets.symmetric(horizontal: 4),
-                                        child: Text(
-                                          'MPT Pole',
-                                          style: TextStyle(color: Colors.black),
-                                        ),
-                                      ),
-                                    ),
-                                    Center(
-                                      child: Text(
-                                        'Pcs',
-                                        style: TextStyle(color: Colors.black),
-                                      ),
-                                    ),
-                                    Center(
-                                      child: Text(
-                                        poles.where((p) => p.enumPoleType == EnumPoleType.mpt).length.toString(),
-                                        style: TextStyle(color: Colors.black),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
+              //                 TableRow(
+              //                   decoration: BoxDecoration(color: Colors.white.withAlpha((0.9 * 255).toInt())),
+              //                   children: [
+              //                     Center(
+              //                       child: Text('4'),
+              //                     ),
+              //                     Center(
+              //                       child: SizedBox(
+              //                         width: 25,
+              //                         height: 25,
+              //                         child: Card(
+              //                           elevation: 0,
+              //                           shape: CircleBorder(),
+              //                           color: Colors.green,
+              //                           child: Center(
+              //                             child: Container(
+              //                               height: 3,
+              //                               width: 35,
+              //                               color: Colors.black,
+              //                             ),
+              //                           ),
+              //                         ),
+              //                       ),
+              //                     ),
+              //                     Center(
+              //                       child: Padding(
+              //                         padding: EdgeInsets.symmetric(horizontal: 4),
+              //                         child: Text(
+              //                           'MPT Pole',
+              //                           style: TextStyle(color: Colors.black),
+              //                         ),
+              //                       ),
+              //                     ),
+              //                     Center(
+              //                       child: Text(
+              //                         'Pcs',
+              //                         style: TextStyle(color: Colors.black),
+              //                       ),
+              //                     ),
+              //                     Center(
+              //                       child: Text(
+              //                         poles.where((p) => p.enumPoleType == EnumPoleType.mpt).length.toString(),
+              //                         style: TextStyle(color: Colors.black),
+              //                       ),
+              //                     ),
+              //                   ],
+              //                 ),
+              //               ],
+              //             ),
+              //           ),
+              //         ],
+              //       ),
+              //     ),
+              //   ],
+              // );
+            },
           ),
         ),
       ),
@@ -3168,9 +3848,9 @@ class _SiteDetailPageState extends State<SiteDetailPage> {
   String _p(int n) => n.toString().padLeft(2, '0');
 }
 import 'dart:math';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:lmt/core/constants/app_functions.dart';
 import 'package:lmt/core/extensions/string_extension.dart';
 import 'package:lmt/src/models/site_detail_model.dart';
 import 'package:lmt/src/views/sites/detail/pdf_helper.dart';
@@ -3186,23 +3866,23 @@ PdfColor pdfColorBlue1 = PdfColor.fromHex('#90abdd');
 PdfColor pdfColorBlue2 = PdfColor.fromHex('#dae3f3');
 PdfColor pdfColorGrey1 = PdfColor.fromHex('#d9d9d9');
 
-Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
+Future<Uint8List> _buildPdf(Map<String, dynamic> params) async {
   final doc = pw.Document(title: 'Site Detail Report', author: 'Galaxia Net');
 
-  final mpt = p['imgMpt'] as Uint8List;
-  final ksgm = p['imgKsgm'] as Uint8List;
-  final mapImg = p['mapImage'] as Uint8List?;
-  final circuitId = p['circuitId'] as String;
-  final d4Bytes = (p['d4'] as List<dynamic>).cast<Uint8List>();
+  final mpt = params['imgMpt'] as Uint8List;
+  final ksgm = params['imgKsgm'] as Uint8List;
+  final mapImg = params['mapImage'] as Uint8List?;
+  final circuitId = params['circuitId'] as String;
+  final d4Bytes = (params['d4'] as List<dynamic>).cast<Uint8List>();
 
-  final poles = (p['poles'] as List<dynamic>).cast<Map<String, dynamic>>();
+  final poles = (params['poles'] as List<dynamic>).cast<Map<String, dynamic>>();
 
   pw.ImageProvider? img(String key) {
-    final b = p[key] as Uint8List?;
+    final b = params[key] as Uint8List?;
     return b == null ? null : pw.MemoryImage(b);
   }
 
-  String s(String key) => (p[key] as String?) ?? '-';
+  String s(String key) => (params[key] as String?) ?? '-';
 
   // ── Page 1: Cover ─────────────────────────────────────────────────────────
   doc.addPage(
@@ -4445,7 +5125,6 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
             (index) => null,
           ),
         ];
-
         return [
           pw.Container(
             width: double.infinity,
@@ -4490,7 +5169,6 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                   flex: 3,
                   child: pw.Container(
                     width: double.infinity,
-
                     alignment: pw.Alignment.centerLeft,
                     child: pw.Padding(
                       padding: pw.EdgeInsets.all(8),
@@ -4564,7 +5242,6 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
                   flex: 3,
                   child: pw.Container(
                     width: double.infinity,
-
                     alignment: pw.Alignment.centerLeft,
                     child: pw.Padding(
                       padding: pw.EdgeInsets.all(8),
@@ -4607,7 +5284,6 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
               ],
             ),
           ),
-
           pw.GridView(
             crossAxisCount: 2,
             childAspectRatio: 6 / 5,
@@ -4792,7 +5468,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> p) async {
       },
     ),
   );
-
+  superPrint('pdf has been saved');
   return await doc.save();
 }
 
@@ -4863,21 +5539,45 @@ class _SiteDetailPdfViewPageState extends State<SiteDetailPdfViewPage> {
     final imgMptData = await rootBundle.load('assets/mptlogo.jpg');
     final imgKsgmData = await rootBundle.load('assets/ksgm.jpg');
 
-    // 2. All named network images in parallel with per-image progress updates.
+    // 2. Named network images — one at a time.
     final entries = _imageEntries;
+    final namedResults = <(String, Uint8List?)>[];
+    for (final e in entries) {
+      final bytes = await fetchBytes(e.$2);
+      setState(() {
+        _progress += 1;
+      });
+      namedResults.add((e.$1, bytes));
+    }
 
-    final namedResults = await Future.wait(
-      entries.map((e) async {
-        final bytes = await fetchBytes(e.$2);
-        return (e.$1, bytes);
-      }),
-    );
-
-    // 3. d4 list (variable length).
+    // 3. d4 list — one at a time.
     final d4Urls = _sd.gallery?.d4 ?? [];
-    final d4Bytes = await Future.wait(d4Urls.map(fetchBytes));
+    final d4Bytes = <Uint8List?>[];
+    for (final url in d4Urls) {
+      setState(() {
+        _progress += 1;
+      });
+      d4Bytes.add(await fetchBytes(url));
+    }
 
-    // 4. Assemble the params map for compute(). //majorParams
+    // 4. Poles — one at a time.
+    final poleParams = <Map<String, dynamic>>[];
+    for (final pole in (_sd.poles ?? [])) {
+      superPrint(pole);
+      final imageBytes = await fetchBytes(pole.image);
+      setState(() {
+        _progress += 1;
+      });
+      poleParams.add({
+        'poleId': pole.id ?? '-',
+        'poleType': pole ?? '-',
+        'lat': pole.lat ?? 0,
+        'lng': pole.lng ?? 0,
+        'imageBytes': imageBytes,
+      });
+    }
+
+    // 5. Assemble the params map for compute().
     final params = <String, dynamic>{
       'imgMpt': imgMptData.buffer.asUint8List(),
       'imgKsgm': imgKsgmData.buffer.asUint8List(),
@@ -4903,22 +5603,10 @@ class _SiteDetailPdfViewPageState extends State<SiteDetailPdfViewPage> {
       'rowIssue': _sd.rowIssue,
       'ontSerialNumber': _sd.ontSnNumber ?? '-',
       'lspName': _sd.lspName ?? '-',
-
       // d4
       'd4': d4Bytes.whereType<Uint8List>().toList(),
-      //poles
-      'poles': await Future.wait(
-        (_sd.poles ?? []).map((pole) async {
-          final imageBytes = await fetchBytes(pole.image);
-          return {
-            'poleId': pole.id ?? '-',
-            'poleType': pole.enumPoleType?.name ?? '-',
-            'lat': pole.lat ?? 0,
-            'lng': pole.lng ?? 0,
-            'imageBytes': imageBytes, // Uint8List? — safe to pass to compute()
-          };
-        }),
-      ),
+      // poles
+      'poles': poleParams,
     };
 
     // Add all named image bytes.
@@ -4926,10 +5614,11 @@ class _SiteDetailPdfViewPageState extends State<SiteDetailPdfViewPage> {
       params[r.$1] = r.$2;
     }
 
-    // 5. Build + encode PDF in a background isolate.
+    // 6. Build + encode PDF in a background isolate.
     await Future.delayed(const Duration(milliseconds: 500));
 
-    final pdfBytes = await compute(_buildPdf, params);
+    // final pdfBytes = await compute(_buildPdf, params);
+    final pdfBytes = await _buildPdf(params);
 
     await Future.delayed(const Duration(milliseconds: 250));
 
@@ -4957,21 +5646,17 @@ class _SiteDetailPdfViewPageState extends State<SiteDetailPdfViewPage> {
       body: SizedBox.expand(
         child: _isLoading
             ? _loadingView()
-            : Column(
-                children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Center(
-                          child: AspectRatio(
-                            aspectRatio: 7 / 10,
-                            child: _pdfView(),
-                          ),
-                        ),
-                      ],
+            : SizedBox(
+                height: double.infinity,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: min(500, ((MediaQuery.of(context).size.width) * 0.9))),
+                      child: _pdfView(),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
       ),
     );
@@ -4992,7 +5677,7 @@ class _SiteDetailPdfViewPageState extends State<SiteDetailPdfViewPage> {
           Text(_progressLabel, style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: 4),
           Text(
-            '${(_progress * 100).toStringAsFixed(0)}%',
+            '${(_progress).toStringAsFixed(0)}/25 images',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
         ],
@@ -5420,8 +6105,39 @@ pw.Widget labeled(String label, pw.Widget photos) => pw.Column(
     photos,
   ],
 );
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:lmt/core/services/site_service.dart';
+
+// ── Sort option ───────────────────────────────────────────────────────────────
+
+enum _SortOption {
+  newestFirst('created_at', false, 'Newest first'),
+  oldestFirst('created_at', true, 'Oldest first'),
+  circuitIdAZ('circuit_id', true, 'Circuit ID  A → Z'),
+  circuitIdZA('circuit_id', false, 'Circuit ID  Z → A'),
+  customerAZ('customer_name', true, 'Customer  A → Z'),
+  activationNewest('activation_date_time', false, 'Activation  newest first');
+
+  const _SortOption(this.field, this.ascending, this.label);
+  final String field;
+  final bool ascending;
+  final String label;
+}
+
+// ── Activation filter option ──────────────────────────────────────────────────
+
+enum _ActivationFilter {
+  all('All'),
+  activated('Activated'),
+  notActivated('Not activated');
+
+  const _ActivationFilter(this.label);
+  final String label;
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 class SiteListPage extends StatefulWidget {
   const SiteListPage({super.key});
@@ -5434,25 +6150,211 @@ class _SiteListPageState extends State<SiteListPage> {
   final _service = SupabaseSiteService();
   final List<Map<String, dynamic>> _sites = [];
   final _scrollCtrl = ScrollController();
+  final _searchCtrl = TextEditingController();
 
   int _page = 0;
   bool _loading = false;
   bool _hasMore = true;
   static const _limit = 20;
 
+  // ── Search / sort / filter state ──────────────────────────────────────────
+  String _searchQuery = '';
+  _SortOption _sort = _SortOption.newestFirst;
+  _ActivationFilter _activationFilter = _ActivationFilter.all;
+  Timer? _debounce;
+
+  bool get _hasActiveFilters => _activationFilter != _ActivationFilter.all;
+
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
+
   @override
   void initState() {
     super.initState();
     _fetchMore();
-    _scrollCtrl.addListener(() {
-      if (_scrollCtrl.position.pixels >= _scrollCtrl.position.maxScrollExtent - 200) {
-        _fetchMore();
+    _scrollCtrl.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollCtrl.dispose();
+    _searchCtrl.dispose();
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollCtrl.position.pixels >= _scrollCtrl.position.maxScrollExtent - 200) {
+      _fetchMore();
+    }
+  }
+
+  // ── Data loading ──────────────────────────────────────────────────────────
+
+  Future<void> _fetchMore() async {
+    if (_loading || !_hasMore) return;
+    setState(() => _loading = true);
+
+    // final data = await _service.listSites(
+    //   page: _page,
+    //   limit: _limit,
+    //   // search: _searchQuery.isEmpty ? null : _searchQuery,
+    //   // sortField: _sort.field,
+    //   // sortAsc: _sort.ascending,
+    //   // filterActivated: _activationFilter == _ActivationFilter.all ? null : _activationFilter == _ActivationFilter.activated,
+    // );
+
+    final data = await _service.listSitesByFliter(
+      page: _page,
+      limit: _limit,
+      search: _searchQuery.isEmpty ? null : _searchQuery,
+      sortField: _sort.field,
+      sortAsc: _sort.ascending,
+    );
+
+    setState(() {
+      _sites.addAll(data);
+      _page++;
+      _loading = false;
+      if (data.length < _limit) _hasMore = false;
+    });
+  }
+
+  Future<void> _refresh() async {
+    setState(() {
+      _sites.clear();
+      _page = 0;
+      _hasMore = true;
+    });
+    await _fetchMore();
+  }
+
+  // ── Search debounce ───────────────────────────────────────────────────────
+
+  void _onSearchChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      if (value != _searchQuery) {
+        _searchQuery = value;
+        _refresh();
       }
     });
   }
 
+  void _clearSearch() {
+    _searchCtrl.clear();
+    _searchQuery = '';
+    _refresh();
+  }
+
+  // ── Sort / filter sheet ───────────────────────────────────────────────────
+
+  void _openSortFilter() {
+    // Snapshot current values so cancel works correctly
+    var tempSort = _sort;
+    var tempFilter = _activationFilter;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Handle bar
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ── Sort ───────────────────────────────────────────────
+                  Text('Sort by', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: _SortOption.values.map((opt) {
+                      final selected = tempSort == opt;
+                      return ChoiceChip(
+                        label: Text(opt.label, style: const TextStyle(fontSize: 12)),
+                        selected: selected,
+                        onSelected: (_) => setSheetState(() => tempSort = opt),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // ── Activation filter ──────────────────────────────────
+                  Text('Activation status', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: _ActivationFilter.values.map((f) {
+                      final selected = tempFilter == f;
+                      return ChoiceChip(
+                        label: Text(f.label, style: const TextStyle(fontSize: 12)),
+                        selected: selected,
+                        onSelected: (_) => setSheetState(() => tempFilter = f),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // ── Buttons ────────────────────────────────────────────
+                  Row(
+                    children: [
+                      // Reset
+                      OutlinedButton(
+                        onPressed: () {
+                          setSheetState(() {
+                            tempSort = _SortOption.newestFirst;
+                            tempFilter = _ActivationFilter.all;
+                          });
+                        },
+                        child: const Text('Reset'),
+                      ),
+                      const SizedBox(width: 12),
+                      // Apply
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            final changed = tempSort != _sort || tempFilter != _activationFilter;
+                            _sort = tempSort;
+                            _activationFilter = tempFilter;
+                            if (changed) _refresh();
+                          },
+                          child: const Text('Apply'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ── Counts helper (unchanged) ─────────────────────────────────────────────
+
   ({int images, int poles, int polesWithImage}) _counts(Map<String, dynamic> site) {
-    // Gallery — single-slot fields
     final g = site['site_gallery'] as Map<String, dynamic>?;
     int images = 0;
     if (g != null) {
@@ -5485,59 +6387,84 @@ class _SiteListPageState extends State<SiteListPage> {
       for (final k in singleKeys) {
         if (g[k] != null) images++;
       }
-      // d4 is a JSON array of URLs
       final d4 = g['d4'];
       if (d4 is List) images += d4.length;
     }
-
-    // Poles
     final poleList = (site['site_poles'] as List?) ?? [];
     final poles = poleList.length;
     final polesWithImage = poleList.where((p) => (p as Map<String, dynamic>)['image'] != null).length;
-
     return (images: images, poles: poles, polesWithImage: polesWithImage);
   }
 
-  Future<void> _fetchMore() async {
-    if (_loading || !_hasMore) return;
-    setState(() => _loading = true);
-
-    final data = await _service.listSites(page: _page, limit: _limit);
-
-    setState(() {
-      _sites.addAll(data);
-      _page++;
-      _loading = false;
-      if (data.length < _limit) _hasMore = false;
-    });
-  }
-
-  Future<void> _refresh() async {
-    setState(() {
-      _sites.clear();
-      _page = 0;
-      _hasMore = true;
-    });
-    await _fetchMore();
-  }
+  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('FTTH Sites - v(1.0.2)'),
+        title: const Text('FTTH Sites - v(1.0.4)'),
         actions: [
+          // Sort / filter button with active badge
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.tune),
+                tooltip: 'Sort & Filter',
+                onPressed: _openSortFilter,
+              ),
+              if (_hasActiveFilters)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: Colors.orange,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
+          ),
           TextButton(
             onPressed: () async {
               await Navigator.pushNamed(context, '/import');
               _refresh();
             },
-            child: Text(
-              'Import Excel',
-              style: TextStyle(color: Colors.yellow),
-            ),
+            child: const Text('Import Excel', style: TextStyle(color: Colors.yellow)),
           ),
         ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(56),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+            child: TextField(
+              controller: _searchCtrl,
+              onChanged: _onSearchChanged,
+              decoration: InputDecoration(
+                hintText: 'Search circuit ID, customer, LSP...',
+                hintStyle: const TextStyle(fontSize: 13),
+                prefixIcon: const Icon(Icons.search, size: 20),
+                suffixIcon: _searchCtrl.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.close, size: 18),
+                        onPressed: _clearSearch,
+                      )
+                    : null,
+                isDense: true,
+                filled: true,
+                fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+            ),
+          ),
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
@@ -5546,74 +6473,262 @@ class _SiteListPageState extends State<SiteListPage> {
         },
         child: const Icon(Icons.add),
       ),
-      body: RefreshIndicator(
-        onRefresh: _refresh,
-        child: _sites.isEmpty && !_loading
-            ? const Center(child: Text('No sites yet. Tap + to create one.'))
-            : ListView.separated(
-                controller: _scrollCtrl,
-                itemCount: _sites.length + (_loading ? 1 : 0),
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (context, index) {
-                  if (index == _sites.length) {
-                    return const Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Center(child: CircularProgressIndicator()),
-                    );
-                  }
-                  final site = _sites[index];
-                  final c = _counts(site);
-                  return ListTile(
-                    leading: const CircleAvatar(
-                      backgroundColor: Color(0xFF1565C0),
-                      child: Icon(Icons.cell_tower, color: Colors.white, size: 18),
+      body: Column(
+        children: [
+          // Active filter chips row
+          if (_hasActiveFilters)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(12, 6, 12, 4),
+              color: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha(120),
+              child: Wrap(
+                spacing: 6,
+                children: [
+                  if (_activationFilter != _ActivationFilter.all)
+                    _FilterChip(
+                      label: _activationFilter.label,
+                      onRemove: () {
+                        setState(() => _activationFilter = _ActivationFilter.all);
+                        _refresh();
+                      },
                     ),
-                    title: Text(
-                      site['circuit_id'] ?? '',
-                      style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (site['customer_name'] != null) Text(site['customer_name']),
-                        if (site['lsp_name'] != null) Text(site['lsp_name'], style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                        const SizedBox(height: 3),
-                        Row(
-                          children: [
-                            Icon(Icons.photo_library_outlined, size: 13, color: Colors.blueGrey.shade400),
-                            const SizedBox(width: 3),
-                            Text(
-                              '${c.images} photos',
-                              style: TextStyle(fontSize: 11, color: Colors.blueGrey.shade400),
-                            ),
-                            const SizedBox(width: 10),
-                            Icon(Icons.cell_tower, size: 13, color: Colors.blueGrey.shade400),
-                            const SizedBox(width: 3),
-                            Text(
-                              '${c.poles} poles  (${c.polesWithImage} with photo)',
-                              style: TextStyle(fontSize: 11, color: Colors.blueGrey.shade400),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () async {
-                      await Navigator.pushNamed(context, '/detail', arguments: site['circuit_id']);
-                      _refresh();
-                    },
-                  );
-                },
+                ],
               ),
+            ),
+          // Sort indicator row
+          if (_sort != _SortOption.newestFirst)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+              child: Row(
+                children: [
+                  Icon(Icons.sort, size: 14, color: Colors.grey.shade500),
+                  const SizedBox(width: 4),
+                  Text(
+                    _sort.label,
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                  ),
+                ],
+              ),
+            ),
+          // List
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _refresh,
+              child: _sites.isEmpty && !_loading
+                  ? _buildEmpty()
+                  : ListView.separated(
+                      controller: _scrollCtrl,
+                      itemCount: _sites.length + (_loading ? 1 : 0),
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        if (index == _sites.length) {
+                          return const Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Center(child: CircularProgressIndicator()),
+                          );
+                        }
+                        return _buildItem(_sites[index]);
+                      },
+                    ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
+  Widget _buildEmpty() {
+    final hasQuery = _searchQuery.isNotEmpty || _hasActiveFilters;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(hasQuery ? Icons.search_off : Icons.cell_tower, size: 48, color: Colors.grey.shade400),
+          const SizedBox(height: 12),
+          Text(
+            hasQuery ? 'No results found' : 'No sites yet. Tap + to create one.',
+            style: TextStyle(color: Colors.grey.shade500),
+          ),
+          if (hasQuery) ...[
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () {
+                _searchCtrl.clear();
+                _searchQuery = '';
+                setState(() => _activationFilter = _ActivationFilter.all);
+                _refresh();
+              },
+              child: const Text('Clear search & filters'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildItem(Map<String, dynamic> site) {
+    final c = _counts(site);
+    final isActivated = site['activation_date_time'] != null;
+
+    return ListTile(
+      leading: CircleAvatar(
+        backgroundColor: const Color(0xFF1565C0),
+        child: const Icon(Icons.cell_tower, color: Colors.white, size: 18),
+      ),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              site['circuit_id'] ?? '',
+              style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold),
+            ),
+          ),
+          // Activation badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: isActivated ? Colors.green.shade50 : Colors.orange.shade50,
+              border: Border.all(
+                color: isActivated ? Colors.green.shade300 : Colors.orange.shade300,
+              ),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              isActivated ? 'Active' : 'Pending',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: isActivated ? Colors.green.shade700 : Colors.orange.shade700,
+              ),
+            ),
+          ),
+        ],
+      ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (site['customer_name'] != null) Text(site['customer_name']),
+          if (site['lsp_name'] != null) Text(site['lsp_name'], style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          const SizedBox(height: 3),
+          Row(
+            children: [
+              Icon(Icons.photo_library_outlined, size: 13, color: Colors.blueGrey.shade400),
+              const SizedBox(width: 3),
+              Text('${c.images} photos', style: TextStyle(fontSize: 11, color: Colors.blueGrey.shade400)),
+              const SizedBox(width: 10),
+              Icon(Icons.cell_tower, size: 13, color: Colors.blueGrey.shade400),
+              const SizedBox(width: 3),
+              Text('${c.poles} poles  (${c.polesWithImage} with photo)', style: TextStyle(fontSize: 11, color: Colors.blueGrey.shade400)),
+            ],
+          ),
+        ],
+      ),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () async {
+        await Navigator.pushNamed(context, '/detail', arguments: site['circuit_id']);
+        _refresh();
+      },
+    );
+  }
+}
+
+// ── Small removable filter chip ───────────────────────────────────────────────
+
+class _FilterChip extends StatelessWidget {
+  final String label;
+  final VoidCallback onRemove;
+
+  const _FilterChip({required this.label, required this.onRemove});
+
+  @override
+  Widget build(BuildContext context) {
+    return Chip(
+      label: Text(label, style: const TextStyle(fontSize: 11)),
+      deleteIcon: const Icon(Icons.close, size: 14),
+      onDeleted: onRemove,
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+  }
+}
+import 'dart:typed_data';
+
+import 'package:flutter/material.dart';
+import 'package:lmt/src/models/site_detail_model.dart';
+import 'package:lmt/src/views/sites/export/site_pdf_controller.dart';
+
+class SitePdfPage extends StatefulWidget {
+  final SiteDetailModel siteDetailModel;
+  final Uint8List mapImage;
+
+  const SitePdfPage({
+    super.key,
+    required this.siteDetailModel,
+    required this.mapImage,
+  });
+
+  @override
+  State<SitePdfPage> createState() => _SitePdfPageState();
+}
+
+class _SitePdfPageState extends State<SitePdfPage> {
+  SitePdfPageController _pageController = SitePdfPageController();
+
+  @override
+  void initState() {
+    _pageController.initLoad(widget.siteDetailModel);
+    super.initState();
+  }
+
   @override
   void dispose() {
-    _scrollCtrl.dispose();
+    _pageController.dispose();
     super.dispose();
   }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(),
+    );
+  }
+}
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:lmt/src/models/site_detail_model.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:pdf/pdf.dart';
+import 'package:http/http.dart' as http;
+
+class SitePdfPageController {
+  late SiteDetailModel siteDetailModel;
+  ValueNotifier<bool> isLoading = ValueNotifier(true);
+
+  Future<void> initLoad(SiteDetailModel siteDetail) async {
+    siteDetailModel = siteDetail;
+    await Future.delayed(const Duration(milliseconds: 1200));
+    isLoading.value = false;
+  }
+
+  void _buildPdf() async {
+    //prepare logos
+    final imgMptData = await rootBundle.load('assets/mptlogo.jpg');
+    final imgKsgmData = await rootBundle.load('assets/ksgm.jpg');
+  }
+
+  Future<Uint8List?> _fetchBytes(String? url) async {
+    if (url == null) return null;
+    try {
+      final res = await http.get(Uri.parse(url));
+      return res.statusCode == 200 ? res.bodyBytes : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> dispose() async {}
 }
 import 'dart:convert';
 import 'package:file_picker/file_picker.dart';

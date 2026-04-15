@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lmt/src/views/maps/map_test.dart';
 import 'package:lmt/src/views/sites/create/site_create_page.dart';
 import 'package:lmt/src/views/sites/detail/site_detail_page.dart';
 import 'package:lmt/src/views/sites/import/site_import_page.dart';
@@ -16,6 +17,7 @@ class MyApp extends StatelessWidget {
       routes: {
         '/': (_) => const SiteListPage(),
         '/create': (_) => const SiteCreatePage(),
+        '/map_page': (_) => const MapPage(),
       },
       theme: ThemeData(
         useMaterial3: false,

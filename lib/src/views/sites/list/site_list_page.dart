@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:lmt/core/services/site_service.dart';
+import 'package:lmt/src/models/site_detail_model.dart';
 
 // ── Sort option ───────────────────────────────────────────────────────────────
 
@@ -55,9 +57,9 @@ class _SiteListPageState extends State<SiteListPage> {
   _SortOption _sort = _SortOption.newestFirst;
   _ActivationFilter _activationFilter = _ActivationFilter.all;
   Timer? _debounce;
+  Set<EnumSiteStatus> _statusFilter = {};
 
-  bool get _hasActiveFilters => _activationFilter != _ActivationFilter.all;
-
+  bool get _hasActiveFilters => _activationFilter != _ActivationFilter.all || _statusFilter.isNotEmpty;
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
   @override
@@ -87,21 +89,13 @@ class _SiteListPageState extends State<SiteListPage> {
     if (_loading || !_hasMore) return;
     setState(() => _loading = true);
 
-    // final data = await _service.listSites(
-    //   page: _page,
-    //   limit: _limit,
-    //   // search: _searchQuery.isEmpty ? null : _searchQuery,
-    //   // sortField: _sort.field,
-    //   // sortAsc: _sort.ascending,
-    //   // filterActivated: _activationFilter == _ActivationFilter.all ? null : _activationFilter == _ActivationFilter.activated,
-    // );
-
     final data = await _service.listSitesByFliter(
       page: _page,
       limit: _limit,
       search: _searchQuery.isEmpty ? null : _searchQuery,
       sortField: _sort.field,
       sortAsc: _sort.ascending,
+      statusFilter: _statusFilter.isEmpty ? null : _statusFilter.map((s) => s.dbValue).toList(),
     );
 
     setState(() {
@@ -142,9 +136,9 @@ class _SiteListPageState extends State<SiteListPage> {
   // ── Sort / filter sheet ───────────────────────────────────────────────────
 
   void _openSortFilter() {
-    // Snapshot current values so cancel works correctly
     var tempSort = _sort;
-    var tempFilter = _activationFilter;
+    var tempActivation = _activationFilter;
+    var tempStatus = Set<EnumSiteStatus>.from(_statusFilter);
 
     showModalBottomSheet(
       context: context,
@@ -181,27 +175,38 @@ class _SiteListPageState extends State<SiteListPage> {
                     spacing: 8,
                     runSpacing: 4,
                     children: _SortOption.values.map((opt) {
-                      final selected = tempSort == opt;
                       return ChoiceChip(
                         label: Text(opt.label, style: const TextStyle(fontSize: 12)),
-                        selected: selected,
+                        selected: tempSort == opt,
                         onSelected: (_) => setSheetState(() => tempSort = opt),
                       );
                     }).toList(),
                   ),
                   const SizedBox(height: 20),
 
-                  // ── Activation filter ──────────────────────────────────
-                  Text('Activation status', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                  // ── Status filter ──────────────────────────────────────
+                  Text('Site Status', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
-                    children: _ActivationFilter.values.map((f) {
-                      final selected = tempFilter == f;
-                      return ChoiceChip(
-                        label: Text(f.label, style: const TextStyle(fontSize: 12)),
+                    runSpacing: 4,
+                    children: EnumSiteStatus.values.map((s) {
+                      final selected = tempStatus.contains(s);
+                      return FilterChip(
+                        label: Text(s.label, style: const TextStyle(fontSize: 12)),
                         selected: selected,
-                        onSelected: (_) => setSheetState(() => tempFilter = f),
+                        selectedColor: s.badgeColor.withAlpha(50),
+                        checkmarkColor: s.badgeColor,
+                        side: BorderSide(
+                          color: selected ? s.badgeColor : Colors.grey.shade300,
+                        ),
+                        onSelected: (_) => setSheetState(() {
+                          if (selected) {
+                            tempStatus.remove(s);
+                          } else {
+                            tempStatus.add(s);
+                          }
+                        }),
                       );
                     }).toList(),
                   ),
@@ -210,25 +215,25 @@ class _SiteListPageState extends State<SiteListPage> {
                   // ── Buttons ────────────────────────────────────────────
                   Row(
                     children: [
-                      // Reset
                       OutlinedButton(
                         onPressed: () {
                           setSheetState(() {
                             tempSort = _SortOption.newestFirst;
-                            tempFilter = _ActivationFilter.all;
+                            tempActivation = _ActivationFilter.all;
+                            tempStatus = {};
                           });
                         },
                         child: const Text('Reset'),
                       ),
                       const SizedBox(width: 12),
-                      // Apply
                       Expanded(
                         child: FilledButton(
                           onPressed: () {
                             Navigator.pop(ctx);
-                            final changed = tempSort != _sort || tempFilter != _activationFilter;
+                            final changed = tempSort != _sort || tempActivation != _activationFilter || !setEquals(tempStatus, _statusFilter);
                             _sort = tempSort;
-                            _activationFilter = tempFilter;
+                            _activationFilter = tempActivation;
+                            _statusFilter = tempStatus;
                             if (changed) _refresh();
                           },
                           child: const Text('Apply'),
@@ -244,7 +249,6 @@ class _SiteListPageState extends State<SiteListPage> {
       },
     );
   }
-
   // ── Counts helper (unchanged) ─────────────────────────────────────────────
 
   ({int images, int poles, int polesWithImage}) _counts(Map<String, dynamic> site) {
@@ -295,7 +299,7 @@ class _SiteListPageState extends State<SiteListPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('FTTH Sites - v(1.0.4)'),
+        title: const Text('FTTH Sites - v(1.0.5)'),
         actions: [
           // Sort / filter button with active badge
           Stack(
@@ -376,6 +380,7 @@ class _SiteListPageState extends State<SiteListPage> {
               color: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha(120),
               child: Wrap(
                 spacing: 6,
+                runSpacing: 4,
                 children: [
                   if (_activationFilter != _ActivationFilter.all)
                     _FilterChip(
@@ -385,6 +390,16 @@ class _SiteListPageState extends State<SiteListPage> {
                         _refresh();
                       },
                     ),
+                  ..._statusFilter.map(
+                    (s) => _FilterChip(
+                      label: s.label,
+                      color: s.badgeColor,
+                      onRemove: () {
+                        setState(() => _statusFilter.remove(s));
+                        _refresh();
+                      },
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -449,7 +464,10 @@ class _SiteListPageState extends State<SiteListPage> {
               onPressed: () {
                 _searchCtrl.clear();
                 _searchQuery = '';
-                setState(() => _activationFilter = _ActivationFilter.all);
+                setState(() {
+                  _statusFilter = {};
+                  _activationFilter = _ActivationFilter.all;
+                });
                 _refresh();
               },
               child: const Text('Clear search & filters'),
@@ -462,11 +480,11 @@ class _SiteListPageState extends State<SiteListPage> {
 
   Widget _buildItem(Map<String, dynamic> site) {
     final c = _counts(site);
-    final isActivated = site['activation_date_time'] != null;
+    final status = EnumSiteStatusX.fromDb(site['site_status'] as String?);
 
     return ListTile(
       leading: CircleAvatar(
-        backgroundColor: const Color(0xFF1565C0),
+        backgroundColor: status?.badgeColor ?? Colors.blueGrey,
         child: const Icon(Icons.cell_tower, color: Colors.white, size: 18),
       ),
       title: Row(
@@ -477,25 +495,7 @@ class _SiteListPageState extends State<SiteListPage> {
               style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold),
             ),
           ),
-          // Activation badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: isActivated ? Colors.green.shade50 : Colors.orange.shade50,
-              border: Border.all(
-                color: isActivated ? Colors.green.shade300 : Colors.orange.shade300,
-              ),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              isActivated ? 'Active' : 'Pending',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: isActivated ? Colors.green.shade700 : Colors.orange.shade700,
-              ),
-            ),
-          ),
+          SiteStatusBadge(status: status),
         ],
       ),
       subtitle: Column(
@@ -517,11 +517,127 @@ class _SiteListPageState extends State<SiteListPage> {
           ),
         ],
       ),
-      trailing: const Icon(Icons.chevron_right),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Quick status update button
+          IconButton(
+            icon: const Icon(Icons.swap_horiz, size: 20),
+            tooltip: 'Update Status',
+            onPressed: () => _showStatusPicker(site['circuit_id'] as String, status),
+          ),
+          const Icon(Icons.chevron_right),
+        ],
+      ),
       onTap: () async {
         await Navigator.pushNamed(context, '/detail', arguments: site['circuit_id']);
         _refresh();
       },
+    );
+  }
+
+  Future<void> _showStatusPicker(String circuitId, EnumSiteStatus? current) async {
+    EnumSiteStatus? selected = current;
+
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheet) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text('Update Status — $circuitId', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  ...EnumSiteStatus.values.map((s) {
+                    return RadioListTile<EnumSiteStatus>(
+                      dense: true,
+                      value: s,
+                      groupValue: selected,
+                      title: Row(
+                        children: [
+                          Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(color: s.badgeColor, shape: BoxShape.circle),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(s.label),
+                        ],
+                      ),
+                      onChanged: (v) => setSheet(() => selected = v),
+                    );
+                  }),
+                  const SizedBox(height: 12),
+                  FilledButton(
+                    onPressed: selected == null ? null : () => Navigator.pop(ctx, true),
+                    child: const Text('Apply'),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (confirmed == true && selected != null) {
+      try {
+        await _service.updateSiteStatus(circuitId, selected!);
+        _refresh();
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
+        }
+      }
+    }
+  }
+}
+
+class SiteStatusBadge extends StatelessWidget {
+  final EnumSiteStatus? status;
+
+  const SiteStatusBadge({super.key, required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = status;
+    final color = s?.badgeColor ?? Colors.grey;
+    final label = s?.label ?? 'No Status';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withAlpha(30),
+        border: Border.all(color: color.withAlpha(160)),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
     );
   }
 }
@@ -531,14 +647,18 @@ class _SiteListPageState extends State<SiteListPage> {
 class _FilterChip extends StatelessWidget {
   final String label;
   final VoidCallback onRemove;
+  final Color? color;
 
-  const _FilterChip({required this.label, required this.onRemove});
+  const _FilterChip({required this.label, required this.onRemove, this.color});
 
   @override
   Widget build(BuildContext context) {
+    final c = color;
     return Chip(
-      label: Text(label, style: const TextStyle(fontSize: 11)),
-      deleteIcon: const Icon(Icons.close, size: 14),
+      label: Text(label, style: TextStyle(fontSize: 11, color: c)),
+      deleteIcon: Icon(Icons.close, size: 14, color: c),
+      side: c != null ? BorderSide(color: c.withAlpha(160)) : null,
+      backgroundColor: c?.withAlpha(25),
       onDeleted: onRemove,
       visualDensity: VisualDensity.compact,
       padding: EdgeInsets.zero,

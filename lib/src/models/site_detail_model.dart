@@ -1,6 +1,56 @@
+import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 
 enum EnumPoleType { epc, mpt, other }
+
+enum EnumSiteStatus {
+  newAssigned,
+  cablingOngoing,
+  cablingDone,
+  activation,
+  qcRequest,
+  qcRejected,
+  completed,
+}
+
+extension EnumSiteStatusX on EnumSiteStatus {
+  String get label => switch (this) {
+    EnumSiteStatus.newAssigned => 'New Assigned',
+    EnumSiteStatus.cablingOngoing => 'Cabling Ongoing',
+    EnumSiteStatus.cablingDone => 'Cabling Done',
+    EnumSiteStatus.activation => 'Activation',
+    EnumSiteStatus.qcRequest => 'QC Request',
+    EnumSiteStatus.qcRejected => 'QC Rejected',
+    EnumSiteStatus.completed => 'Completed',
+  };
+
+  String get dbValue => switch (this) {
+    EnumSiteStatus.newAssigned => 'new_assigned',
+    EnumSiteStatus.cablingOngoing => 'cabling_ongoing',
+    EnumSiteStatus.cablingDone => 'cabling_done',
+    EnumSiteStatus.activation => 'activation',
+    EnumSiteStatus.qcRequest => 'qc_request',
+    EnumSiteStatus.qcRejected => 'qc_rejected',
+    EnumSiteStatus.completed => 'completed',
+  };
+
+  Color get badgeColor => switch (this) {
+    EnumSiteStatus.newAssigned => Colors.blue,
+    EnumSiteStatus.cablingOngoing => Colors.orange,
+    EnumSiteStatus.cablingDone => Colors.teal,
+    EnumSiteStatus.activation => Colors.purple,
+    EnumSiteStatus.qcRequest => Colors.amber.shade700,
+    EnumSiteStatus.qcRejected => Colors.red,
+    EnumSiteStatus.completed => Colors.green,
+  };
+
+  static EnumSiteStatus? fromDb(String? value) {
+    for (final s in EnumSiteStatus.values) {
+      if (s.dbValue == value) return s;
+    }
+    return null;
+  }
+}
 
 class SitePoleModel {
   String? id;
@@ -210,6 +260,7 @@ class SiteGalleryModel {
 
 class SiteDetailModel {
   final String circuitId;
+  EnumSiteStatus? siteStatus;
 
   double? customerLat;
   double? customerLng;
@@ -252,6 +303,7 @@ class SiteDetailModel {
 
   SiteDetailModel({
     required this.circuitId,
+    this.siteStatus,
     this.activationDateTime,
     this.opticalLevelFatPort1310nm,
     this.opticalLevelFatPort1490nm,
@@ -302,6 +354,7 @@ class SiteDetailModel {
 
   factory SiteDetailModel.fromJson(Map<String, dynamic> json) {
     return SiteDetailModel(circuitId: json['circuit_id'])
+      ..siteStatus = EnumSiteStatusX.fromDb(json['site_status'])
       ..customerName = json['customer_name']
       ..lspName = json['lsp_name']
       ..surveyResult = json['survey_result']
@@ -337,6 +390,7 @@ class SiteDetailModel {
 
   Map<String, dynamic> toJson() => {
     'circuit_id': circuitId,
+    'site_status': siteStatus?.dbValue,
     'customer_name': customerName,
     'lsp_name': lspName,
     'survey_result': surveyResult,
@@ -371,6 +425,7 @@ class SiteDetailModel {
 
   SiteDetailModel copyWith({
     String? circuitId,
+    EnumSiteStatus? siteStatus,
     double? customerLat,
     double? customerLng,
     DateTime? workOrderDateTime,
@@ -421,6 +476,7 @@ class SiteDetailModel {
         fatName: fatName ?? this.fatName,
         customerName: customerName ?? this.customerName,
       )
+      ..siteStatus = siteStatus ?? this.siteStatus
       ..customerLat = customerLat ?? this.customerLat
       ..customerLng = customerLng ?? this.customerLng
       ..workOrderDateTime = workOrderDateTime ?? this.workOrderDateTime

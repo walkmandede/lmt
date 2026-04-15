@@ -69,6 +69,7 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
   final Map<String, XFile?> _newFiles = {};
   final List<XFile> _d4NewImages = [];
   final List<String> _d4ExistingUrls = [];
+  EnumSiteStatus? _siteStatus;
 
   // ── Load ─────────────────────────────────────────────────────────────────
 
@@ -83,6 +84,7 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
     if (model == null || !mounted) return;
 
     _circuitIdCtrl.text = model.circuitId;
+    _siteStatus = model.siteStatus;
     _customerNameCtrl.text = model.customerName ?? '';
     _lspNameCtrl.text = model.lspName ?? '';
     _customerLatCtrl.text = model.customerLat?.toString() ?? '';
@@ -153,7 +155,7 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
 
   // ── Image picker ──────────────────────────────────────────────────────────
 
-  Future<XFile?> _pickImageFromSource() async {
+  Future<XFile?> _pickImageFromSource(BuildContext context) async {
     final choice = await showModalBottomSheet<String>(
       context: context,
       builder: (_) => SafeArea(
@@ -180,89 +182,48 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
       ),
     );
     if (choice == null) return null;
-    if (choice == 'paste') return _readClipboardImage();
+    if (context.mounted) {
+      if (choice == 'paste') return _readClipboardImage(context);
+    }
     final src = choice == 'camera' ? ImageSource.camera : ImageSource.gallery;
     return _picker.pickImage(source: src, imageQuality: 80);
   }
 
   /// Reads an image from the system clipboard using super_clipboard.
-  Future<XFile?> _readClipboardImage() async {
-    final bytes = await readClipboardImage();
+  Future<XFile?> _readClipboardImage(BuildContext context) async {
+    superPrint('start');
+    final bytes = await waitForPaste();
+    superPrint(bytes);
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    }
 
     if (bytes != null) {
       return XFile.fromData(bytes);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("No image in clipboard")),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No image found. Try copying again.')),
+        );
+      }
+
+      return null;
     }
-    //   final clipboard = SystemClipboard.instance;
-    //   if (clipboard == null) {
-    //     if (mounted) {
-    //       ScaffoldMessenger.of(context).showSnackBar(
-    //         const SnackBar(content: Text('Clipboard not available on this platform.')),
-    //       );
-    //     }
-    //     return null;
-    //   }
-
-    //   final reader = await clipboard.read();
-
-    //   superPrint(reader.items.first);
-    //   superPrint((await reader.items.first.getVirtualFileReceiver()).);
-
-    //   for (final format in [Formats.png, Formats.jpeg, Formats.gif, Formats.webp]) {
-    //     if (reader.canProvide(format)) {
-    //       final completer = Completer<XFile?>();
-    //       reader.getFile(format, (file) async {
-    //         try {
-    //           final bytes = await file.readAll();
-    //           final ext = format == Formats.png
-    //               ? 'png'
-    //               : format == Formats.jpeg
-    //               ? 'jpg'
-    //               : format == Formats.gif
-    //               ? 'gif'
-    //               : 'webp';
-    //           final mime = format == Formats.png
-    //               ? 'image/png'
-    //               : format == Formats.jpeg
-    //               ? 'image/jpeg'
-    //               : format == Formats.gif
-    //               ? 'image/gif'
-    //               : 'image/webp';
-    //           completer.complete(
-    //             XFile.fromData(bytes, name: 'pasted.$ext', mimeType: mime),
-    //           );
-    //         } catch (_) {
-    //           completer.complete(null);
-    //         }
-    //       }, onError: (_) => completer.complete(null));
-    //       final result = await completer.future;
-    //       if (result != null) return result;
-    //     }
-    //   }
-
-    //   if (mounted) {
-    //     ScaffoldMessenger.of(context).showSnackBar(
-    //       const SnackBar(content: Text('No image found in clipboard.')),
-    //     );
-    //   }
-    return null;
   }
 
   Future<void> _pickGalleryImage(String key) async {
-    final picked = await _pickImageFromSource();
+    final picked = await _pickImageFromSource(context);
     if (picked != null) setState(() => _newFiles[key] = picked);
   }
 
   Future<void> _pickPoleImage(int index) async {
-    final picked = await _pickImageFromSource();
+    final picked = await _pickImageFromSource(context);
     if (picked != null) setState(() => _poles[index].newImage = picked);
   }
 
   Future<void> _pickD4Image() async {
-    final picked = await _pickImageFromSource();
+    final picked = await _pickImageFromSource(context);
     if (picked != null) setState(() => _d4NewImages.add(picked));
   }
 
@@ -458,6 +419,7 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
       final circuitId = widget.circuitId;
 
       final model = SiteDetailModel(circuitId: circuitId)
+        ..siteStatus = _siteStatus
         ..customerName = _customerNameCtrl.text.trim().nullIfEmpty
         ..lspName = _lspNameCtrl.text.trim().nullIfEmpty
         ..customerLat = double.tryParse(_customerLatCtrl.text)
@@ -729,6 +691,35 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
           ),
           _dateTile('Work Order Date/Time', _workOrderDate, (d) => setState(() => _workOrderDate = d)),
           _dateTile('Activation Date', _activationDate, (d) => setState(() => _activationDate = d)),
+          const SizedBox(height: 4),
+          DropdownButtonFormField<EnumSiteStatus>(
+            initialValue: _siteStatus,
+            decoration: const InputDecoration(
+              labelText: 'Site Status',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            items: EnumSiteStatus.values
+                .map(
+                  (s) => DropdownMenuItem(
+                    value: s,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(color: s.badgeColor, shape: BoxShape.circle),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(s.label),
+                      ],
+                    ),
+                  ),
+                )
+                .toList(),
+            onChanged: (v) => setState(() => _siteStatus = v),
+          ),
+          const SizedBox(height: 12),
         ],
       ),
     );

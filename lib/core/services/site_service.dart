@@ -1,6 +1,32 @@
+import 'dart:typed_data';
+
 import 'package:lmt/core/constants/app_functions.dart';
 import 'package:lmt/src/models/site_detail_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'dart:js_interop';
+import 'dart:convert';
+
+@JS('listenForPaste')
+external JSPromise<JSAny?> _listenForPaste();
+
+/// Call this, then tell the user to press Ctrl+V / Cmd+V
+Future<Uint8List?> waitForPaste() async {
+  try {
+    final result = await _listenForPaste().toDart;
+    if (result == null) return null;
+
+    final dataUrl = (result as JSString).toDart;
+    // dataUrl = "data:image/jpeg;base64,/9j/4AAQ..."
+    final comma = dataUrl.indexOf(',');
+    if (comma == -1) return null;
+
+    return base64Decode(dataUrl.substring(comma + 1));
+  } catch (e) {
+    superPrint('Paste error: $e');
+    return null;
+  }
+}
 
 class SupabaseSiteService {
   final client = Supabase.instance.client;
@@ -32,7 +58,7 @@ class SupabaseSiteService {
       await client
           .from('site_details')
           .select(
-            'circuit_id, customer_name, lsp_name, created_at, survey_result, '
+            'circuit_id, customer_name, lsp_name, created_at, survey_result, site_status, '
             'site_gallery(an_node,d1_1,d1_2,d2_1,d2_2,d3_1,d3_2,d4,'
             'e1,e2,e3,e4_1,e4_2,e5,e6_1,e6_2,e6_3,'
             'f1,f2,f3,f4_1,f4_2,f5,f6_1,f6_2), '
@@ -49,6 +75,7 @@ class SupabaseSiteService {
     String? search,
     String sortField = 'created_at',
     bool sortAsc = false,
+    List<String>? statusFilter, // <-- new
   }) async {
     final from = page * limit;
     final to = from + limit - 1;
@@ -56,21 +83,22 @@ class SupabaseSiteService {
     var query = client
         .from('site_details')
         .select(
-          'circuit_id, customer_name, lsp_name, created_at, survey_result, '
+          'circuit_id, customer_name, lsp_name, created_at, survey_result, site_status, '
           'site_gallery(an_node,d1_1,d1_2,d2_1,d2_2,d3_1,d3_2,d4,'
           'e1,e2,e3,e4_1,e4_2,e5,e6_1,e6_2,e6_3,'
           'f1,f2,f3,f4_1,f4_2,f5,f6_1,f6_2), '
           'site_poles(id,image)',
         );
 
-    superPrint(query);
-
-    // Search across circuit_id, customer_name, lsp_name
     if (search != null && search.trim().isNotEmpty) {
       final q = search.trim();
       query = query.or(
         'circuit_id.ilike.%$q%,customer_name.ilike.%$q%,lsp_name.ilike.%$q%',
       );
+    }
+
+    if (statusFilter != null && statusFilter.isNotEmpty) {
+      query = query.inFilter('site_status', statusFilter);
     }
 
     return List<Map<String, dynamic>>.from(
@@ -82,6 +110,10 @@ class SupabaseSiteService {
     await client.from('site_poles').delete().eq('circuit_id', circuitId);
     await client.from('site_gallery').delete().eq('circuit_id', circuitId);
     await client.from('site_details').delete().eq('circuit_id', circuitId);
+  }
+
+  Future<void> updateSiteStatus(String circuitId, EnumSiteStatus status) async {
+    await client.from('site_details').update({'site_status': status.dbValue}).eq('circuit_id', circuitId);
   }
 
   // ─── POLES ───────────────────────────────────────────────────────────────
