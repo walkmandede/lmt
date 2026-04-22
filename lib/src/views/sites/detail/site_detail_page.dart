@@ -178,7 +178,7 @@ class _SiteDetailPageState extends State<SiteDetailPage> {
                 ),
                 TextButton(
                   onPressed: () async {
-                    _site!.downloadKMZ();
+                    await _site!.shareKMZ();
                     // try {
                     //   final kmzPath = await _site!.exportToKMZ();
                     //   await SharePlus.instance.share(

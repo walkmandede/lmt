@@ -1,8 +1,8 @@
 import 'package:archive/archive.dart';
 import 'dart:typed_data';
-import 'dart:html' as html;
 
 import 'package:lmt/src/models/site_detail_model.dart';
+import 'package:share_plus/share_plus.dart';
 
 /// Service to export SiteDetailModel to KMZ format (Flutter Web)
 class SiteDetailKMZExport {
@@ -177,9 +177,9 @@ class SiteDetailKMZExport {
     );
 
     final kmzBytes = ZipEncoder().encode(archive);
-    if (kmzBytes == null) {
-      throw Exception('Failed to encode KMZ file');
-    }
+    // if (kmzBytes == null) {
+    //   throw Exception('Failed to encode KMZ file');
+    // }
 
     return Uint8List.fromList(kmzBytes);
   }
@@ -189,12 +189,12 @@ class SiteDetailKMZExport {
     required String circuitId,
     required Uint8List kmzBytes,
   }) {
-    final blob = html.Blob([kmzBytes], 'application/vnd.google-earth.kmz');
-    final url = html.Url.createObjectUrl(blob);
-    final anchor = html.AnchorElement(href: url)
-      ..setAttribute('download', '$circuitId.kmz')
-      ..click();
-    html.Url.revokeObjectUrl(url);
+    // final blob = html.Blob([kmzBytes], 'application/vnd.google-earth.kmz');
+    // final url = html.Url.createObjectUrl(blob);
+    // final anchor = html.AnchorElement(href: url)
+    //   ..setAttribute('download', '$circuitId.kmz')
+    //   ..click();
+    // html.Url.revokeObjectUrl(url);
   }
 
   /// Download KML file (uncompressed)
@@ -202,12 +202,12 @@ class SiteDetailKMZExport {
     required String circuitId,
     required String kmlContent,
   }) {
-    final blob = html.Blob([kmlContent], 'application/vnd.google-earth.kml+xml');
-    final url = html.Url.createObjectUrl(blob);
-    final anchor = html.AnchorElement(href: url)
-      ..setAttribute('download', '$circuitId.kml')
-      ..click();
-    html.Url.revokeObjectUrl(url);
+    // final blob = html.Blob([kmlContent], 'application/vnd.google-earth.kml+xml');
+    // final url = html.Url.createObjectUrl(blob);
+    // final anchor = html.AnchorElement(href: url)
+    //   ..setAttribute('download', '$circuitId.kml')
+    //   ..click();
+    // html.Url.revokeObjectUrl(url);
   }
 
   /// Get KMZ as data URL (for preview or sharing)
@@ -222,7 +222,7 @@ class SiteDetailKMZExport {
     for (int i = 0; i < bytes.length; i++) {
       chars.add(String.fromCharCode(bytes[i]));
     }
-    return html.window.btoa(chars.join());
+    return chars.join();
   }
 }
 
@@ -258,6 +258,17 @@ extension SiteDetailModelKMZX on SiteDetailModel {
     SiteDetailKMZExport.downloadKMZ(
       circuitId: circuitId,
       kmzBytes: kmzBytes,
+    );
+  }
+
+  Future<void> shareKMZ() async {
+    final kmlContent = toKML();
+    final kmzBytes = SiteDetailKMZExport.createKMZBytes(kmlContent);
+    await SharePlus.instance.share(
+      ShareParams(
+        text: 'Share for site',
+        files: [XFile.fromData(kmzBytes, name: '$circuitId.kmz')],
+      ),
     );
   }
 
