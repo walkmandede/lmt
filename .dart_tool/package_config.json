@@ -27,7 +27,7 @@
     },
     {
       "name": "archive",
-      "rootUri": "file:///Users/kyawphyoehan/.pub-cache/hosted/pub.dev/archive-3.6.1",
+      "rootUri": "file:///Users/kyawphyoehan/.pub-cache/hosted/pub.dev/archive-4.0.9",
       "packageUri": "lib/",
       "languageVersion": "3.0"
     },
@@ -285,9 +285,9 @@
     },
     {
       "name": "image",
-      "rootUri": "file:///Users/kyawphyoehan/.pub-cache/hosted/pub.dev/image-4.3.0",
+      "rootUri": "file:///Users/kyawphyoehan/.pub-cache/hosted/pub.dev/image-4.8.0",
       "packageUri": "lib/",
-      "languageVersion": "2.15"
+      "languageVersion": "3.0"
     },
     {
       "name": "image_picker",
@@ -512,6 +512,12 @@
       "languageVersion": "3.2"
     },
     {
+      "name": "posix",
+      "rootUri": "file:///Users/kyawphyoehan/.pub-cache/hosted/pub.dev/posix-6.5.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
+    },
+    {
       "name": "postgrest",
       "rootUri": "file:///Users/kyawphyoehan/.pub-cache/hosted/pub.dev/postgrest-2.6.0",
       "packageUri": "lib/",
@@ -564,6 +570,18 @@
       "rootUri": "file:///Users/kyawphyoehan/.pub-cache/hosted/pub.dev/screenshot-3.0.0",
       "packageUri": "lib/",
       "languageVersion": "2.12"
+    },
+    {
+      "name": "share_plus",
+      "rootUri": "file:///Users/kyawphyoehan/.pub-cache/hosted/pub.dev/share_plus-12.0.2",
+      "packageUri": "lib/",
+      "languageVersion": "3.4"
+    },
+    {
+      "name": "share_plus_platform_interface",
+      "rootUri": "file:///Users/kyawphyoehan/.pub-cache/hosted/pub.dev/share_plus_platform_interface-6.1.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.18"
     },
     {
       "name": "shared_preferences",

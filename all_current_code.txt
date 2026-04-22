@@ -341,8 +341,8 @@ class SupabaseSiteService {
       await client
           .from('site_details')
           .select(
-            'circuit_id, customer_name, lsp_name, created_at, survey_result, '
-            'site_gallery(an_node,d1_1,d1_2,d2_1,d2_2,d3_1,d3_2,d4,'
+            'circuit_id, customer_name, lsp_name, created_at, survey_result, site_status, '
+            'site_gallery(an_node,map_image,d1_1,d1_2,d2_1,d2_2,d3_1,d3_2,d4,'
             'e1,e2,e3,e4_1,e4_2,e5,e6_1,e6_2,e6_3,'
             'f1,f2,f3,f4_1,f4_2,f5,f6_1,f6_2), '
             'site_poles(id,image)',
@@ -358,6 +358,7 @@ class SupabaseSiteService {
     String? search,
     String sortField = 'created_at',
     bool sortAsc = false,
+    List<String>? statusFilter,
   }) async {
     final from = page * limit;
     final to = from + limit - 1;
@@ -365,21 +366,22 @@ class SupabaseSiteService {
     var query = client
         .from('site_details')
         .select(
-          'circuit_id, customer_name, lsp_name, created_at, survey_result, '
-          'site_gallery(an_node,d1_1,d1_2,d2_1,d2_2,d3_1,d3_2,d4,'
+          'circuit_id, customer_name, lsp_name, created_at, survey_result, site_status, '
+          'site_gallery(an_node,map_image,d1_1,d1_2,d2_1,d2_2,d3_1,d3_2,d4,'
           'e1,e2,e3,e4_1,e4_2,e5,e6_1,e6_2,e6_3,'
           'f1,f2,f3,f4_1,f4_2,f5,f6_1,f6_2), '
           'site_poles(id,image)',
         );
 
-    superPrint(query);
-
-    // Search across circuit_id, customer_name, lsp_name
     if (search != null && search.trim().isNotEmpty) {
       final q = search.trim();
       query = query.or(
         'circuit_id.ilike.%$q%,customer_name.ilike.%$q%,lsp_name.ilike.%$q%',
       );
+    }
+
+    if (statusFilter != null && statusFilter.isNotEmpty) {
+      query = query.inFilter('site_status', statusFilter);
     }
 
     return List<Map<String, dynamic>>.from(
@@ -393,10 +395,13 @@ class SupabaseSiteService {
     await client.from('site_details').delete().eq('circuit_id', circuitId);
   }
 
+  Future<void> updateSiteStatus(String circuitId, EnumSiteStatus status) async {
+    await client.from('site_details').update({'site_status': status.dbValue}).eq('circuit_id', circuitId);
+  }
+
   // ─── POLES ───────────────────────────────────────────────────────────────
 
   Future<void> savePoles(String circuitId, List<SitePoleModel> poles) async {
-    // Delete existing then re-insert so order is preserved
     await client.from('site_poles').delete().eq('circuit_id', circuitId);
 
     if (poles.isEmpty) return;
@@ -404,7 +409,7 @@ class SupabaseSiteService {
     final rows = poles.map((p) {
       final j = p.toJson();
       j['circuit_id'] = circuitId;
-      j.remove('id'); // let Supabase generate id on insert
+      j.remove('id');
       return j;
     }).toList();
 
@@ -664,9 +669,59 @@ class MyApp extends StatelessWidget {
     );
   }
 }
+import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 
 enum EnumPoleType { epc, mpt, other }
+
+enum EnumSiteStatus {
+  newAssigned,
+  cablingOngoing,
+  cablingDone,
+  activation,
+  qcRequest,
+  qcRejected,
+  completed,
+}
+
+extension EnumSiteStatusX on EnumSiteStatus {
+  String get label => switch (this) {
+    EnumSiteStatus.newAssigned => 'New Assigned',
+    EnumSiteStatus.cablingOngoing => 'Cabling Ongoing',
+    EnumSiteStatus.cablingDone => 'Cabling Done',
+    EnumSiteStatus.activation => 'Activation',
+    EnumSiteStatus.qcRequest => 'QC Request',
+    EnumSiteStatus.qcRejected => 'QC Rejected',
+    EnumSiteStatus.completed => 'Completed',
+  };
+
+  String get dbValue => switch (this) {
+    EnumSiteStatus.newAssigned => 'new_assigned',
+    EnumSiteStatus.cablingOngoing => 'cabling_ongoing',
+    EnumSiteStatus.cablingDone => 'cabling_done',
+    EnumSiteStatus.activation => 'activation',
+    EnumSiteStatus.qcRequest => 'qc_request',
+    EnumSiteStatus.qcRejected => 'qc_rejected',
+    EnumSiteStatus.completed => 'completed',
+  };
+
+  Color get badgeColor => switch (this) {
+    EnumSiteStatus.newAssigned => Colors.blue,
+    EnumSiteStatus.cablingOngoing => Colors.orange,
+    EnumSiteStatus.cablingDone => Colors.teal,
+    EnumSiteStatus.activation => Colors.purple,
+    EnumSiteStatus.qcRequest => Colors.amber.shade700,
+    EnumSiteStatus.qcRejected => Colors.red,
+    EnumSiteStatus.completed => Colors.green,
+  };
+
+  static EnumSiteStatus? fromDb(String? value) {
+    for (final s in EnumSiteStatus.values) {
+      if (s.dbValue == value) return s;
+    }
+    return null;
+  }
+}
 
 class SitePoleModel {
   String? id;
@@ -730,6 +785,9 @@ class SiteGalleryModel {
   String? circuitId;
   String? anNode;
 
+  // ── Map image ─────────────────────────────────────────────────────────────
+  String? mapImage;
+
   String? d1_1;
   String? d1_2;
   String? d2_1;
@@ -762,6 +820,7 @@ class SiteGalleryModel {
   factory SiteGalleryModel.fromJson(Map<String, dynamic> json) {
     return SiteGalleryModel(circuitId: json['circuit_id'])
       ..anNode = json['an_node']
+      ..mapImage = json['map_image']
       ..d1_1 = json['d1_1']
       ..d1_2 = json['d1_2']
       ..d2_1 = json['d2_1']
@@ -790,6 +849,7 @@ class SiteGalleryModel {
 
   Map<String, dynamic> toJson() => {
     'an_node': anNode,
+    'map_image': mapImage,
     'circuit_id': circuitId,
     'd1_1': d1_1,
     'd1_2': d1_2,
@@ -820,6 +880,7 @@ class SiteGalleryModel {
   SiteGalleryModel copyWith({
     String? circuitId,
     String? anNode,
+    String? mapImage,
     String? d1_1,
     String? d1_2,
     String? d2_1,
@@ -847,6 +908,7 @@ class SiteGalleryModel {
   }) {
     return SiteGalleryModel(circuitId: circuitId ?? this.circuitId)
       ..anNode = anNode ?? this.anNode
+      ..mapImage = mapImage ?? this.mapImage
       ..d1_1 = d1_1 ?? this.d1_1
       ..d1_2 = d1_2 ?? this.d1_2
       ..d2_1 = d2_1 ?? this.d2_1
@@ -876,6 +938,7 @@ class SiteGalleryModel {
 
 class SiteDetailModel {
   final String circuitId;
+  EnumSiteStatus? siteStatus;
 
   double? customerLat;
   double? customerLng;
@@ -918,6 +981,7 @@ class SiteDetailModel {
 
   SiteDetailModel({
     required this.circuitId,
+    this.siteStatus,
     this.activationDateTime,
     this.opticalLevelFatPort1310nm,
     this.opticalLevelFatPort1490nm,
@@ -968,6 +1032,7 @@ class SiteDetailModel {
 
   factory SiteDetailModel.fromJson(Map<String, dynamic> json) {
     return SiteDetailModel(circuitId: json['circuit_id'])
+      ..siteStatus = EnumSiteStatusX.fromDb(json['site_status'])
       ..customerName = json['customer_name']
       ..lspName = json['lsp_name']
       ..surveyResult = json['survey_result']
@@ -1003,6 +1068,7 @@ class SiteDetailModel {
 
   Map<String, dynamic> toJson() => {
     'circuit_id': circuitId,
+    'site_status': siteStatus?.dbValue,
     'customer_name': customerName,
     'lsp_name': lspName,
     'survey_result': surveyResult,
@@ -1037,6 +1103,7 @@ class SiteDetailModel {
 
   SiteDetailModel copyWith({
     String? circuitId,
+    EnumSiteStatus? siteStatus,
     double? customerLat,
     double? customerLng,
     DateTime? workOrderDateTime,
@@ -1087,6 +1154,7 @@ class SiteDetailModel {
         fatName: fatName ?? this.fatName,
         customerName: customerName ?? this.customerName,
       )
+      ..siteStatus = siteStatus ?? this.siteStatus
       ..customerLat = customerLat ?? this.customerLat
       ..customerLng = customerLng ?? this.customerLng
       ..workOrderDateTime = workOrderDateTime ?? this.workOrderDateTime
@@ -1616,29 +1684,29 @@ class _SiteMapWidgetState extends State<SiteMapWidget> {
               child: Stack(
                 children: [
                   // ── Google Map ──────────────────────────────────────────────────
-                  gmaps.GoogleMap(
-                    initialCameraPosition: gmaps.CameraPosition(
-                      target: _initialCenter(),
-                      zoom: 15,
-                    ),
-                    markers: _markers,
-                    polylines: _polylines,
-                    myLocationButtonEnabled: false,
-                    zoomControlsEnabled: true,
-                    onMapCreated: (ctrl) async {
-                      if (widget.onMapCreated != null) {
-                        widget.onMapCreated!(ctrl);
-                      }
+                  // gmaps.GoogleMap(
+                  //   initialCameraPosition: gmaps.CameraPosition(
+                  //     target: _initialCenter(),
+                  //     zoom: 15,
+                  //   ),
+                  //   markers: _markers,
+                  //   polylines: _polylines,
+                  //   myLocationButtonEnabled: false,
+                  //   zoomControlsEnabled: true,
+                  //   onMapCreated: (ctrl) async {
+                  //     if (widget.onMapCreated != null) {
+                  //       widget.onMapCreated!(ctrl);
+                  //     }
 
-                      _controller.complete(ctrl);
-                      await _fitBounds();
-                      await _updateOverlayPositions();
-                    },
-                    onCameraMove: _onCameraMove,
-                    onCameraIdle: _onCameraIdle,
-                  ),
+                  //     _controller.complete(ctrl);
+                  //     await _fitBounds();
+                  //     await _updateOverlayPositions();
+                  //   },
+                  //   onCameraMove: _onCameraMove,
+                  //   onCameraIdle: _onCameraIdle,
+                  // ),
 
-                  // ── FAT info box ────────────────────────────────────────────────
+                  // // ── FAT info box ────────────────────────────────────────────────
                   if (showOverlays && _fatOffset != null && site.fatLat != null && site.fatLng != null)
                     Positioned(
                       left: _fatOffset!.dx + 12,
@@ -1829,6 +1897,7 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
   final Map<String, XFile?> _newFiles = {};
   final List<XFile> _d4NewImages = [];
   final List<String> _d4ExistingUrls = [];
+  EnumSiteStatus? _siteStatus;
 
   // ── Load ─────────────────────────────────────────────────────────────────
 
@@ -1843,6 +1912,7 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
     if (model == null || !mounted) return;
 
     _circuitIdCtrl.text = model.circuitId;
+    _siteStatus = model.siteStatus;
     _customerNameCtrl.text = model.customerName ?? '';
     _lspNameCtrl.text = model.lspName ?? '';
     _customerLatCtrl.text = model.customerLat?.toString() ?? '';
@@ -2177,6 +2247,7 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
       final circuitId = widget.circuitId;
 
       final model = SiteDetailModel(circuitId: circuitId)
+        ..siteStatus = _siteStatus
         ..customerName = _customerNameCtrl.text.trim().nullIfEmpty
         ..lspName = _lspNameCtrl.text.trim().nullIfEmpty
         ..customerLat = double.tryParse(_customerLatCtrl.text)
@@ -2206,6 +2277,7 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
       final gallery = SiteGalleryModel(circuitId: circuitId);
       const allKeys = {
         'an_node',
+        'map_image',
         'd1_1',
         'd1_2',
         'd2_1',
@@ -2372,6 +2444,9 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
       case 'f6_2':
         g.f6_2 = url;
         break;
+      case 'map_image':
+        g.mapImage = url;
+        break;
     }
   }
 
@@ -2448,6 +2523,35 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
           ),
           _dateTile('Work Order Date/Time', _workOrderDate, (d) => setState(() => _workOrderDate = d)),
           _dateTile('Activation Date', _activationDate, (d) => setState(() => _activationDate = d)),
+          const SizedBox(height: 4),
+          DropdownButtonFormField<EnumSiteStatus>(
+            initialValue: _siteStatus,
+            decoration: const InputDecoration(
+              labelText: 'Site Status',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            items: EnumSiteStatus.values
+                .map(
+                  (s) => DropdownMenuItem(
+                    value: s,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(color: s.badgeColor, shape: BoxShape.circle),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(s.label),
+                      ],
+                    ),
+                  ),
+                )
+                .toList(),
+            onChanged: (v) => setState(() => _siteStatus = v),
+          ),
+          const SizedBox(height: 12),
         ],
       ),
     );
@@ -2599,6 +2703,8 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
           const _SubLabel('AN  Node photo'),
           _keyedPhotoSlot('an_node', 'AN Node'),
           const SizedBox(height: 12),
+          const _SubLabel('Map Image'),
+          _keyedPhotoSlot('map_image', 'Map Image'),
           const _SubLabel('D1  FAT before installation'),
           _twoPhotoRow('d1_1', 'FAT Closed', 'd1_2', 'FAT Open'),
           const SizedBox(height: 12),
@@ -2797,6 +2903,7 @@ import 'package:lmt/src/views/_widgets/site_map_widget.dart';
 import 'package:lmt/src/views/sites/detail/site_detail_pdf_view_page.dart';
 import 'package:lmt/src/views/sites/detail/site_map_edit_page.dart';
 import 'package:lmt/src/views/sites/export/site_pdf_page.dart';
+import 'package:lmt/src/views/sites/list/site_list_page.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:http/http.dart' as http;
 
@@ -2935,30 +3042,6 @@ class _SiteDetailPageState extends State<SiteDetailPage> {
                   },
                 ),
                 IconButton(
-                  icon: Icon(Icons.picture_as_pdf),
-                  onPressed: () async {
-                    // final mapImg = await _screenshotController.capture();
-                    // final mapCtrl = await _googleMapController.future;
-                    // superPrint(mapCtrl.mapId);
-                    // final mapImg = await (await _googleMapController.future).takeSnapshot();
-                    // await Future.delayed(const Duration(milliseconds: 200));
-                    // superPrint(mapImg?.length);
-                    // if (context.mounted) {
-                    //   Navigator.push(
-                    //     context,
-                    //     MaterialPageRoute(
-                    //       builder: (context) {
-                    //         return SitePdfPage(
-                    //           siteDetailModel: _site!,
-                    //           mapImage: mapImg!,
-                    //         );
-                    //       },
-                    //     ),
-                    //   );
-                    // }
-                  },
-                ),
-                IconButton(
                   icon: const Icon(Icons.edit),
                   onPressed: () async {
                     await Navigator.pushNamed(context, '/update', arguments: widget.circuitId);
@@ -2989,6 +3072,7 @@ class _SiteDetailPageState extends State<SiteDetailPage> {
         child: ListView(
           padding: const EdgeInsets.only(bottom: 32),
           children: [
+            _statusSection(site),
             _mapSection(context, site),
             _sectionA(site),
             _sectionB(site),
@@ -3001,6 +3085,97 @@ class _SiteDetailPageState extends State<SiteDetailPage> {
         ),
       ),
     );
+  }
+
+  Widget _statusSection(SiteDetailModel site) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Row(
+        children: [
+          const Text('Status:', style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(width: 10),
+          SiteStatusBadge(status: site.siteStatus),
+          const Spacer(),
+          TextButton.icon(
+            icon: const Icon(Icons.swap_horiz, size: 16),
+            label: const Text('Change'),
+            onPressed: () => _showStatusPicker(site),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showStatusPicker(SiteDetailModel site) async {
+    EnumSiteStatus? selected = site.siteStatus;
+
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheet) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text('Update Status', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  ...EnumSiteStatus.values.map((s) {
+                    return RadioListTile<EnumSiteStatus>(
+                      dense: true,
+                      value: s,
+                      groupValue: selected,
+                      title: Row(
+                        children: [
+                          Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(color: s.badgeColor, shape: BoxShape.circle),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(s.label),
+                        ],
+                      ),
+                      onChanged: (v) => setSheet(() => selected = v),
+                    );
+                  }),
+                  const SizedBox(height: 12),
+                  FilledButton(
+                    onPressed: selected == null ? null : () => Navigator.pop(ctx, true),
+                    child: const Text('Apply'),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (confirmed == true && selected != null) {
+      try {
+        await _service.updateSiteStatus(site.circuitId, selected!);
+        _load();
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
+        }
+      }
+    }
   }
 
   // - map ---
@@ -3643,6 +3818,7 @@ class _SiteDetailPageState extends State<SiteDetailPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _photoGroup('AN  Node', [g?.anNode], ['']),
+          _photoGroup('Map Image', [g?.mapImage], ['']),
           _photoGroup('D1  Before installation', [g?.d1_1, g?.d1_2], ['FAT Closed', 'FAT Open']),
           _photoGroup('D2  After installation', [g?.d2_1, g?.d2_2], ['View 1', 'View 2']),
           _photoGroup('D3  Cable label inside FAT', [g?.d3_1, g?.d3_2], ['Label 1', 'Label 2']),
@@ -3871,7 +4047,11 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> params) async {
 
   final mpt = params['imgMpt'] as Uint8List;
   final ksgm = params['imgKsgm'] as Uint8List;
-  final mapImg = params['mapImage'] as Uint8List?;
+  // final mapImg = params['mapImage'] as Uint8List?;
+  // for (var element in params.keys) {
+  //   print(element);
+  // }
+
   final circuitId = params['circuitId'] as String;
   final d4Bytes = (params['d4'] as List<dynamic>).cast<Uint8List>();
 
@@ -3992,10 +4172,13 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> params) async {
             dataRow('8', 'ROW issue', s('rowIssue')),
             pw.SizedBox(height: 16),
             band('C', 'Cable Route Diagram'),
-            if (mapImg != null)
-              pw.Expanded(
-                child: pw.Center(child: pw.Image(pw.MemoryImage(mapImg), width: double.infinity)),
-              ),
+            pw.Expanded(
+              child: img('map_image') == null ? pw.SizedBox.expand() : pw.Image(img('map_image')!),
+            ),
+            // if (mapImgBytes != null)
+            // pw.Expanded(
+            //   child: pw.Center(child: pw.Image(pw.MemoryImage(mapImgBytes), width: double.infinity)),
+            // ),
             pageFooter(3),
           ],
         ),
@@ -5109,12 +5292,179 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> params) async {
   );
 
   // ── Page 10: Poles
+  pw.Widget polePageHeader(pw.Context context) {
+    return pw.Column(
+      children: [
+        pageFooter(context.pageNumber),
+        pw.Container(
+          width: double.infinity,
+          decoration: pw.BoxDecoration(
+            color: pdfColorBlue2,
+            border: pw.Border.all(
+              color: PdfColors.black,
+            ),
+          ),
+          padding: pw.EdgeInsets.all(8),
+          alignment: pw.Alignment.center,
+          child: txt('Cable Laying Check-list for Exisiting Pole'),
+        ),
+        pw.Container(
+          width: double.infinity,
+          decoration: pw.BoxDecoration(
+            color: PdfColors.yellow200,
+            border: pw.Border.all(
+              color: PdfColors.black,
+            ),
+          ),
+          alignment: pw.Alignment.center,
+          child: pw.Row(
+            children: [
+              pw.Expanded(
+                flex: 2,
+                child: pw.Container(
+                  width: double.infinity,
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(
+                      color: PdfColors.black,
+                    ),
+                  ),
+                  alignment: pw.Alignment.centerLeft,
+                  child: pw.Padding(
+                    padding: pw.EdgeInsets.all(8),
+                    child: txt('Link ID:'),
+                  ),
+                ),
+              ),
+              pw.Expanded(
+                flex: 3,
+                child: pw.Container(
+                  width: double.infinity,
+                  alignment: pw.Alignment.centerLeft,
+                  child: pw.Padding(
+                    padding: pw.EdgeInsets.all(8),
+                    child: txt(s('circuitId'), size: 8),
+                  ),
+                ),
+              ),
+              pw.Expanded(
+                flex: 2,
+                child: pw.Container(
+                  width: double.infinity,
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(
+                      color: PdfColors.black,
+                    ),
+                  ),
+                  alignment: pw.Alignment.centerLeft,
+                  child: pw.Padding(
+                    padding: pw.EdgeInsets.all(8),
+                    child: txt('Customer Name:'),
+                  ),
+                ),
+              ),
+              pw.Expanded(
+                flex: 3,
+                child: pw.Container(
+                  width: double.infinity,
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(
+                      color: PdfColors.black,
+                    ),
+                  ),
+                  alignment: pw.Alignment.centerLeft,
+                  child: pw.Padding(
+                    padding: pw.EdgeInsets.all(8),
+                    child: txt(s('customerName')),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        pw.Container(
+          width: double.infinity,
+          decoration: pw.BoxDecoration(
+            color: PdfColors.yellow200,
+            border: pw.Border.all(
+              color: PdfColors.black,
+            ),
+          ),
+          alignment: pw.Alignment.center,
+          child: pw.Row(
+            children: [
+              pw.Expanded(
+                flex: 2,
+                child: pw.Container(
+                  width: double.infinity,
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(
+                      color: PdfColors.black,
+                    ),
+                  ),
+                  alignment: pw.Alignment.centerLeft,
+                  child: pw.Padding(
+                    padding: pw.EdgeInsets.all(8),
+                    child: txt('LSP\'s Name:'),
+                  ),
+                ),
+              ),
+              pw.Expanded(
+                flex: 3,
+                child: pw.Container(
+                  width: double.infinity,
+                  alignment: pw.Alignment.centerLeft,
+                  child: pw.Padding(
+                    padding: pw.EdgeInsets.all(8),
+                    child: txt(s('lspName'), size: 10),
+                  ),
+                ),
+              ),
+              pw.Expanded(
+                flex: 2,
+                child: pw.Container(
+                  width: double.infinity,
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(
+                      color: PdfColors.black,
+                    ),
+                  ),
+                  alignment: pw.Alignment.centerLeft,
+                  child: pw.Padding(
+                    padding: pw.EdgeInsets.all(8),
+                    child: txt('Check Area:'),
+                  ),
+                ),
+              ),
+              pw.Expanded(
+                flex: 3,
+                child: pw.Container(
+                  width: double.infinity,
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(
+                      color: PdfColors.black,
+                    ),
+                  ),
+                  alignment: pw.Alignment.centerLeft,
+                  child: pw.Padding(
+                    padding: pw.EdgeInsets.all(8),
+                    child: txt(poles.isEmpty ? '-' : 'P_001 to P_${poles.length.toString().padLeft(3, '0')}'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   doc.addPage(
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      header: (context) => pageHeader(mpt, ksgm),
-      footer: (context) => pageFooter(context.pageNumber),
+      header: (context) => polePageHeader(context),
+
+      footer: (context) => pageHeader(mpt, ksgm),
       build: (context) {
         List rawPoles = [];
         final remainder = poles.length % 4;
@@ -5126,164 +5476,6 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> params) async {
           ),
         ];
         return [
-          pw.Container(
-            width: double.infinity,
-            decoration: pw.BoxDecoration(
-              color: pdfColorBlue2,
-              border: pw.Border.all(
-                color: PdfColors.black,
-              ),
-            ),
-            padding: pw.EdgeInsets.all(8),
-            alignment: pw.Alignment.center,
-            child: txt('Cable Laying Check-list for Exisiting Pole'),
-          ),
-          pw.Container(
-            width: double.infinity,
-            decoration: pw.BoxDecoration(
-              color: PdfColors.yellow200,
-              border: pw.Border.all(
-                color: PdfColors.black,
-              ),
-            ),
-            alignment: pw.Alignment.center,
-            child: pw.Row(
-              children: [
-                pw.Expanded(
-                  flex: 2,
-                  child: pw.Container(
-                    width: double.infinity,
-                    decoration: pw.BoxDecoration(
-                      border: pw.Border.all(
-                        color: PdfColors.black,
-                      ),
-                    ),
-                    alignment: pw.Alignment.centerLeft,
-                    child: pw.Padding(
-                      padding: pw.EdgeInsets.all(8),
-                      child: txt('Link ID:'),
-                    ),
-                  ),
-                ),
-                pw.Expanded(
-                  flex: 3,
-                  child: pw.Container(
-                    width: double.infinity,
-                    alignment: pw.Alignment.centerLeft,
-                    child: pw.Padding(
-                      padding: pw.EdgeInsets.all(8),
-                      child: txt(s('circuitId'), size: 8),
-                    ),
-                  ),
-                ),
-                pw.Expanded(
-                  flex: 2,
-                  child: pw.Container(
-                    width: double.infinity,
-                    decoration: pw.BoxDecoration(
-                      border: pw.Border.all(
-                        color: PdfColors.black,
-                      ),
-                    ),
-                    alignment: pw.Alignment.centerLeft,
-                    child: pw.Padding(
-                      padding: pw.EdgeInsets.all(8),
-                      child: txt('Customer Name:'),
-                    ),
-                  ),
-                ),
-                pw.Expanded(
-                  flex: 3,
-                  child: pw.Container(
-                    width: double.infinity,
-                    decoration: pw.BoxDecoration(
-                      border: pw.Border.all(
-                        color: PdfColors.black,
-                      ),
-                    ),
-                    alignment: pw.Alignment.centerLeft,
-                    child: pw.Padding(
-                      padding: pw.EdgeInsets.all(8),
-                      child: txt(s('customerName')),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          pw.Container(
-            width: double.infinity,
-            decoration: pw.BoxDecoration(
-              color: PdfColors.yellow200,
-              border: pw.Border.all(
-                color: PdfColors.black,
-              ),
-            ),
-            alignment: pw.Alignment.center,
-            child: pw.Row(
-              children: [
-                pw.Expanded(
-                  flex: 2,
-                  child: pw.Container(
-                    width: double.infinity,
-                    decoration: pw.BoxDecoration(
-                      border: pw.Border.all(
-                        color: PdfColors.black,
-                      ),
-                    ),
-                    alignment: pw.Alignment.centerLeft,
-                    child: pw.Padding(
-                      padding: pw.EdgeInsets.all(8),
-                      child: txt('LSP\'s Name:'),
-                    ),
-                  ),
-                ),
-                pw.Expanded(
-                  flex: 3,
-                  child: pw.Container(
-                    width: double.infinity,
-                    alignment: pw.Alignment.centerLeft,
-                    child: pw.Padding(
-                      padding: pw.EdgeInsets.all(8),
-                      child: txt(s('lspName'), size: 10),
-                    ),
-                  ),
-                ),
-                pw.Expanded(
-                  flex: 2,
-                  child: pw.Container(
-                    width: double.infinity,
-                    decoration: pw.BoxDecoration(
-                      border: pw.Border.all(
-                        color: PdfColors.black,
-                      ),
-                    ),
-                    alignment: pw.Alignment.centerLeft,
-                    child: pw.Padding(
-                      padding: pw.EdgeInsets.all(8),
-                      child: txt('Check Area:'),
-                    ),
-                  ),
-                ),
-                pw.Expanded(
-                  flex: 3,
-                  child: pw.Container(
-                    width: double.infinity,
-                    decoration: pw.BoxDecoration(
-                      border: pw.Border.all(
-                        color: PdfColors.black,
-                      ),
-                    ),
-                    alignment: pw.Alignment.centerLeft,
-                    child: pw.Padding(
-                      padding: pw.EdgeInsets.all(8),
-                      child: txt(poles.isEmpty ? '-' : 'P_001 to P_${poles.length.toString().padLeft(3, '0')}'),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
           pw.GridView(
             crossAxisCount: 2,
             childAspectRatio: 6 / 5,
@@ -5509,6 +5701,7 @@ class _SiteDetailPdfViewPageState extends State<SiteDetailPdfViewPage> {
     final g = _sd.gallery;
     return [
       ('anNode', g?.anNode),
+      ('map_image', g?.mapImage),
       // D
       ('d1_1', g?.d1_1), ('d1_2', g?.d1_2),
       ('d2_1', g?.d2_1), ('d2_2', g?.d2_2),
@@ -6107,8 +6300,10 @@ pw.Widget labeled(String label, pw.Widget photos) => pw.Column(
 );
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:lmt/core/services/site_service.dart';
+import 'package:lmt/src/models/site_detail_model.dart';
 
 // ── Sort option ───────────────────────────────────────────────────────────────
 
@@ -6162,9 +6357,9 @@ class _SiteListPageState extends State<SiteListPage> {
   _SortOption _sort = _SortOption.newestFirst;
   _ActivationFilter _activationFilter = _ActivationFilter.all;
   Timer? _debounce;
+  Set<EnumSiteStatus> _statusFilter = {};
 
-  bool get _hasActiveFilters => _activationFilter != _ActivationFilter.all;
-
+  bool get _hasActiveFilters => _activationFilter != _ActivationFilter.all || _statusFilter.isNotEmpty;
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
   @override
@@ -6194,21 +6389,13 @@ class _SiteListPageState extends State<SiteListPage> {
     if (_loading || !_hasMore) return;
     setState(() => _loading = true);
 
-    // final data = await _service.listSites(
-    //   page: _page,
-    //   limit: _limit,
-    //   // search: _searchQuery.isEmpty ? null : _searchQuery,
-    //   // sortField: _sort.field,
-    //   // sortAsc: _sort.ascending,
-    //   // filterActivated: _activationFilter == _ActivationFilter.all ? null : _activationFilter == _ActivationFilter.activated,
-    // );
-
     final data = await _service.listSitesByFliter(
       page: _page,
       limit: _limit,
       search: _searchQuery.isEmpty ? null : _searchQuery,
       sortField: _sort.field,
       sortAsc: _sort.ascending,
+      statusFilter: _statusFilter.isEmpty ? null : _statusFilter.map((s) => s.dbValue).toList(),
     );
 
     setState(() {
@@ -6249,9 +6436,9 @@ class _SiteListPageState extends State<SiteListPage> {
   // ── Sort / filter sheet ───────────────────────────────────────────────────
 
   void _openSortFilter() {
-    // Snapshot current values so cancel works correctly
     var tempSort = _sort;
-    var tempFilter = _activationFilter;
+    var tempActivation = _activationFilter;
+    var tempStatus = Set<EnumSiteStatus>.from(_statusFilter);
 
     showModalBottomSheet(
       context: context,
@@ -6288,27 +6475,38 @@ class _SiteListPageState extends State<SiteListPage> {
                     spacing: 8,
                     runSpacing: 4,
                     children: _SortOption.values.map((opt) {
-                      final selected = tempSort == opt;
                       return ChoiceChip(
                         label: Text(opt.label, style: const TextStyle(fontSize: 12)),
-                        selected: selected,
+                        selected: tempSort == opt,
                         onSelected: (_) => setSheetState(() => tempSort = opt),
                       );
                     }).toList(),
                   ),
                   const SizedBox(height: 20),
 
-                  // ── Activation filter ──────────────────────────────────
-                  Text('Activation status', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                  // ── Status filter ──────────────────────────────────────
+                  Text('Site Status', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
-                    children: _ActivationFilter.values.map((f) {
-                      final selected = tempFilter == f;
-                      return ChoiceChip(
-                        label: Text(f.label, style: const TextStyle(fontSize: 12)),
+                    runSpacing: 4,
+                    children: EnumSiteStatus.values.map((s) {
+                      final selected = tempStatus.contains(s);
+                      return FilterChip(
+                        label: Text(s.label, style: const TextStyle(fontSize: 12)),
                         selected: selected,
-                        onSelected: (_) => setSheetState(() => tempFilter = f),
+                        selectedColor: s.badgeColor.withAlpha(50),
+                        checkmarkColor: s.badgeColor,
+                        side: BorderSide(
+                          color: selected ? s.badgeColor : Colors.grey.shade300,
+                        ),
+                        onSelected: (_) => setSheetState(() {
+                          if (selected) {
+                            tempStatus.remove(s);
+                          } else {
+                            tempStatus.add(s);
+                          }
+                        }),
                       );
                     }).toList(),
                   ),
@@ -6317,25 +6515,25 @@ class _SiteListPageState extends State<SiteListPage> {
                   // ── Buttons ────────────────────────────────────────────
                   Row(
                     children: [
-                      // Reset
                       OutlinedButton(
                         onPressed: () {
                           setSheetState(() {
                             tempSort = _SortOption.newestFirst;
-                            tempFilter = _ActivationFilter.all;
+                            tempActivation = _ActivationFilter.all;
+                            tempStatus = {};
                           });
                         },
                         child: const Text('Reset'),
                       ),
                       const SizedBox(width: 12),
-                      // Apply
                       Expanded(
                         child: FilledButton(
                           onPressed: () {
                             Navigator.pop(ctx);
-                            final changed = tempSort != _sort || tempFilter != _activationFilter;
+                            final changed = tempSort != _sort || tempActivation != _activationFilter || !setEquals(tempStatus, _statusFilter);
                             _sort = tempSort;
-                            _activationFilter = tempFilter;
+                            _activationFilter = tempActivation;
+                            _statusFilter = tempStatus;
                             if (changed) _refresh();
                           },
                           child: const Text('Apply'),
@@ -6351,7 +6549,6 @@ class _SiteListPageState extends State<SiteListPage> {
       },
     );
   }
-
   // ── Counts helper (unchanged) ─────────────────────────────────────────────
 
   ({int images, int poles, int polesWithImage}) _counts(Map<String, dynamic> site) {
@@ -6402,7 +6599,7 @@ class _SiteListPageState extends State<SiteListPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('FTTH Sites - v(1.0.4)'),
+        title: const Text('FTTH Sites - v(1.0.6)'),
         actions: [
           // Sort / filter button with active badge
           Stack(
@@ -6483,6 +6680,7 @@ class _SiteListPageState extends State<SiteListPage> {
               color: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha(120),
               child: Wrap(
                 spacing: 6,
+                runSpacing: 4,
                 children: [
                   if (_activationFilter != _ActivationFilter.all)
                     _FilterChip(
@@ -6492,6 +6690,16 @@ class _SiteListPageState extends State<SiteListPage> {
                         _refresh();
                       },
                     ),
+                  ..._statusFilter.map(
+                    (s) => _FilterChip(
+                      label: s.label,
+                      color: s.badgeColor,
+                      onRemove: () {
+                        setState(() => _statusFilter.remove(s));
+                        _refresh();
+                      },
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -6556,7 +6764,10 @@ class _SiteListPageState extends State<SiteListPage> {
               onPressed: () {
                 _searchCtrl.clear();
                 _searchQuery = '';
-                setState(() => _activationFilter = _ActivationFilter.all);
+                setState(() {
+                  _statusFilter = {};
+                  _activationFilter = _ActivationFilter.all;
+                });
                 _refresh();
               },
               child: const Text('Clear search & filters'),
@@ -6569,11 +6780,11 @@ class _SiteListPageState extends State<SiteListPage> {
 
   Widget _buildItem(Map<String, dynamic> site) {
     final c = _counts(site);
-    final isActivated = site['activation_date_time'] != null;
+    final status = EnumSiteStatusX.fromDb(site['site_status'] as String?);
 
     return ListTile(
       leading: CircleAvatar(
-        backgroundColor: const Color(0xFF1565C0),
+        backgroundColor: status?.badgeColor ?? Colors.blueGrey,
         child: const Icon(Icons.cell_tower, color: Colors.white, size: 18),
       ),
       title: Row(
@@ -6584,25 +6795,7 @@ class _SiteListPageState extends State<SiteListPage> {
               style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold),
             ),
           ),
-          // Activation badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: isActivated ? Colors.green.shade50 : Colors.orange.shade50,
-              border: Border.all(
-                color: isActivated ? Colors.green.shade300 : Colors.orange.shade300,
-              ),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              isActivated ? 'Active' : 'Pending',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: isActivated ? Colors.green.shade700 : Colors.orange.shade700,
-              ),
-            ),
-          ),
+          SiteStatusBadge(status: status),
         ],
       ),
       subtitle: Column(
@@ -6624,11 +6817,127 @@ class _SiteListPageState extends State<SiteListPage> {
           ),
         ],
       ),
-      trailing: const Icon(Icons.chevron_right),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Quick status update button
+          IconButton(
+            icon: const Icon(Icons.swap_horiz, size: 20),
+            tooltip: 'Update Status',
+            onPressed: () => _showStatusPicker(site['circuit_id'] as String, status),
+          ),
+          const Icon(Icons.chevron_right),
+        ],
+      ),
       onTap: () async {
         await Navigator.pushNamed(context, '/detail', arguments: site['circuit_id']);
         _refresh();
       },
+    );
+  }
+
+  Future<void> _showStatusPicker(String circuitId, EnumSiteStatus? current) async {
+    EnumSiteStatus? selected = current;
+
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheet) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text('Update Status — $circuitId', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  ...EnumSiteStatus.values.map((s) {
+                    return RadioListTile<EnumSiteStatus>(
+                      dense: true,
+                      value: s,
+                      groupValue: selected,
+                      title: Row(
+                        children: [
+                          Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(color: s.badgeColor, shape: BoxShape.circle),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(s.label),
+                        ],
+                      ),
+                      onChanged: (v) => setSheet(() => selected = v),
+                    );
+                  }),
+                  const SizedBox(height: 12),
+                  FilledButton(
+                    onPressed: selected == null ? null : () => Navigator.pop(ctx, true),
+                    child: const Text('Apply'),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (confirmed == true && selected != null) {
+      try {
+        await _service.updateSiteStatus(circuitId, selected!);
+        _refresh();
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
+        }
+      }
+    }
+  }
+}
+
+class SiteStatusBadge extends StatelessWidget {
+  final EnumSiteStatus? status;
+
+  const SiteStatusBadge({super.key, required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = status;
+    final color = s?.badgeColor ?? Colors.grey;
+    final label = s?.label ?? 'No Status';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withAlpha(30),
+        border: Border.all(color: color.withAlpha(160)),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
     );
   }
 }
@@ -6638,14 +6947,18 @@ class _SiteListPageState extends State<SiteListPage> {
 class _FilterChip extends StatelessWidget {
   final String label;
   final VoidCallback onRemove;
+  final Color? color;
 
-  const _FilterChip({required this.label, required this.onRemove});
+  const _FilterChip({required this.label, required this.onRemove, this.color});
 
   @override
   Widget build(BuildContext context) {
+    final c = color;
     return Chip(
-      label: Text(label, style: const TextStyle(fontSize: 11)),
-      deleteIcon: const Icon(Icons.close, size: 14),
+      label: Text(label, style: TextStyle(fontSize: 11, color: c)),
+      deleteIcon: Icon(Icons.close, size: 14, color: c),
+      side: c != null ? BorderSide(color: c.withAlpha(160)) : null,
+      backgroundColor: c?.withAlpha(25),
       onDeleted: onRemove,
       visualDensity: VisualDensity.compact,
       padding: EdgeInsets.zero,
@@ -7182,63 +7495,9 @@ class _SiteCreatePageState extends State<SiteCreatePage> {
       ),
     );
     if (choice == null) return null;
-    if (choice == 'paste') return _readClipboardImage();
+    if (choice == 'paste') return null; // clipboard not implemented in create
     final src = choice == 'camera' ? ImageSource.camera : ImageSource.gallery;
     return _picker.pickImage(source: src, imageQuality: 80);
-  }
-
-  /// Reads an image from the system clipboard using super_clipboard.
-  Future<XFile?> _readClipboardImage() async {
-    // final clipboard = SystemClipboard.instance;
-    // if (clipboard == null) {
-    //   if (mounted) {
-    //     ScaffoldMessenger.of(context).showSnackBar(
-    //       const SnackBar(content: Text('Clipboard not available on this platform.')),
-    //     );
-    //   }
-    //   return null;
-    // }
-
-    // final reader = await clipboard.read();
-
-    // for (final format in [Formats.png, Formats.jpeg, Formats.gif, Formats.webp]) {
-    //   if (reader.canProvide(format)) {
-    //     final completer = Completer<XFile?>();
-    //     reader.getFile(format, (file) async {
-    //       try {
-    //         final bytes = await file.readAll();
-    //         final ext = format == Formats.png
-    //             ? 'png'
-    //             : format == Formats.jpeg
-    //             ? 'jpg'
-    //             : format == Formats.gif
-    //             ? 'gif'
-    //             : 'webp';
-    //         final mime = format == Formats.png
-    //             ? 'image/png'
-    //             : format == Formats.jpeg
-    //             ? 'image/jpeg'
-    //             : format == Formats.gif
-    //             ? 'image/gif'
-    //             : 'image/webp';
-    //         completer.complete(
-    //           XFile.fromData(bytes, name: 'pasted.$ext', mimeType: mime),
-    //         );
-    //       } catch (_) {
-    //         completer.complete(null);
-    //       }
-    //     }, onError: (_) => completer.complete(null));
-    //     final result = await completer.future;
-    //     if (result != null) return result;
-    //   }
-    // }
-
-    // if (mounted) {
-    //   ScaffoldMessenger.of(context).showSnackBar(
-    //     const SnackBar(content: Text('No image found in clipboard.')),
-    //   );
-    // }
-    return null;
   }
 
   Future<void> _pickGalleryImage(String key) async {
@@ -7445,8 +7704,9 @@ class _SiteCreatePageState extends State<SiteCreatePage> {
         ..checkArea = _checkAreaCtrl.text.trim().nullIfEmpty
         ..conclusionAndComments = _conclusionCtrl.text.trim().nullIfEmpty;
 
-      // ── Upload keyed single-slot gallery images ───────────────────────────
       final gallery = SiteGalleryModel(circuitId: circuitId);
+
+      // All keyed gallery images (includes map_image, an_node, d*, e*, f*)
       for (final key in _gallery.keys) {
         final file = _gallery[key];
         if (file == null) continue;
@@ -7458,18 +7718,7 @@ class _SiteCreatePageState extends State<SiteCreatePage> {
         _setGalleryUrl(gallery, key, url);
       }
 
-      // ── Upload AN node image ──────────────────────────────────────────────
-      final anFile = _gallery['an_node'];
-      if (anFile != null) {
-        final url = await _storage.uploadImage(
-          circuitId: circuitId,
-          bytes: await anFile.readAsBytes(),
-          folder: 'an_node',
-        );
-        gallery.anNode = url;
-      }
-
-      // ── Upload D4 accessories images (dynamic list) ───────────────────────
+      // D4 dynamic list
       final d4Urls = <String>[];
       for (int i = 0; i < _d4Images.length; i++) {
         final url = await _storage.uploadImage(
@@ -7483,7 +7732,7 @@ class _SiteCreatePageState extends State<SiteCreatePage> {
 
       model.gallery = gallery;
 
-      // ── Upload pole images and build pole list ────────────────────────────
+      // Poles
       model.poles = await Future.wait(
         _poles.asMap().entries.map((e) async {
           final index = e.key;
@@ -7522,6 +7771,12 @@ class _SiteCreatePageState extends State<SiteCreatePage> {
 
   void _setGalleryUrl(SiteGalleryModel g, String key, String? url) {
     switch (key) {
+      case 'an_node':
+        g.anNode = url;
+        break;
+      case 'map_image':
+        g.mapImage = url;
+        break;
       case 'd1_1':
         g.d1_1 = url;
         break;
@@ -7739,11 +7994,7 @@ class _SiteCreatePageState extends State<SiteCreatePage> {
           ),
           DropdownButtonFormField<EnumPoleType>(
             initialValue: entry.type,
-            decoration: const InputDecoration(
-              labelText: 'Pole Type',
-              isDense: true,
-              border: OutlineInputBorder(),
-            ),
+            decoration: const InputDecoration(labelText: 'Pole Type', isDense: true, border: OutlineInputBorder()),
             items: EnumPoleType.values.map((t) => DropdownMenuItem(value: t, child: Text(t.name.toUpperCase()))).toList(),
             onChanged: (v) => setState(() => entry.type = v),
           ),
@@ -7795,6 +8046,10 @@ class _SiteCreatePageState extends State<SiteCreatePage> {
         children: [
           const _SubLabel('AN  Node photo'),
           _keyedPhotoSlot('an_node', 'AN Node'),
+          const SizedBox(height: 12),
+          // ── Map Image ──────────────────────────────────────────────────────
+          const _SubLabel('Map Image'),
+          _keyedPhotoSlot('map_image', 'Map / Route screenshot'),
           const SizedBox(height: 12),
           const _SubLabel('D1  FAT before installation'),
           _twoPhotoRow('d1_1', 'FAT Closed', 'd1_2', 'FAT Open'),
@@ -7919,7 +8174,7 @@ class _SiteCreatePageState extends State<SiteCreatePage> {
   }
 }
 
-// ── Pole entry data holder ────────────────────────────────────────────────────
+// ── Pole entry ────────────────────────────────────────────────────────────────
 
 class _PoleEntry {
   EnumPoleType? type = EnumPoleType.other;

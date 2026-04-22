@@ -13,12 +13,14 @@ import 'package:lmt/src/models/site_detail_model.dart';
 import 'package:lmt/src/views/_widgets/image_viewer_page.dart';
 import 'package:lmt/src/views/_widgets/section_card.dart';
 import 'package:lmt/src/views/_widgets/site_map_widget.dart';
+import 'package:lmt/src/views/sites/detail/site_detail_kmz_export.dart';
 import 'package:lmt/src/views/sites/detail/site_detail_pdf_view_page.dart';
 import 'package:lmt/src/views/sites/detail/site_map_edit_page.dart';
 import 'package:lmt/src/views/sites/export/site_pdf_page.dart';
 import 'package:lmt/src/views/sites/list/site_list_page.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:http/http.dart' as http;
+import 'package:share_plus/share_plus.dart';
 
 String _buildStaticMapUrl({
   required SiteDetailModel site,
@@ -155,30 +157,6 @@ class _SiteDetailPageState extends State<SiteDetailPage> {
                   },
                 ),
                 IconButton(
-                  icon: Icon(Icons.picture_as_pdf),
-                  onPressed: () async {
-                    // final mapImg = await _screenshotController.capture();
-                    // final mapCtrl = await _googleMapController.future;
-                    // superPrint(mapCtrl.mapId);
-                    // final mapImg = await (await _googleMapController.future).takeSnapshot();
-                    // await Future.delayed(const Duration(milliseconds: 200));
-                    // superPrint(mapImg?.length);
-                    // if (context.mounted) {
-                    //   Navigator.push(
-                    //     context,
-                    //     MaterialPageRoute(
-                    //       builder: (context) {
-                    //         return SitePdfPage(
-                    //           siteDetailModel: _site!,
-                    //           mapImage: mapImg!,
-                    //         );
-                    //       },
-                    //     ),
-                    //   );
-                    // }
-                  },
-                ),
-                IconButton(
                   icon: const Icon(Icons.edit),
                   onPressed: () async {
                     await Navigator.pushNamed(context, '/update', arguments: widget.circuitId);
@@ -198,6 +176,27 @@ class _SiteDetailPageState extends State<SiteDetailPage> {
                     _load();
                   },
                 ),
+                TextButton(
+                  onPressed: () async {
+                    _site!.downloadKMZ();
+                    // try {
+                    //   final kmzPath = await _site!.exportToKMZ();
+                    //   await SharePlus.instance.share(
+                    //     ShareParams(
+                    //       subject: '${_site?.circuitId} - Circuit Map',
+
+                    //       files: [XFile(kmzPath)],
+                    //     ),
+                    //   );
+                    // } catch (e) {
+                    //   print('Error exporting KMZ: $e');
+                    // }
+                  },
+                  child: Text(
+                    'Export KMZ',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
                 IconButton(
                   icon: const Icon(Icons.delete),
                   onPressed: _confirmDelete,
@@ -210,7 +209,7 @@ class _SiteDetailPageState extends State<SiteDetailPage> {
           padding: const EdgeInsets.only(bottom: 32),
           children: [
             _statusSection(site),
-            _mapSection(context, site),
+            // _mapSection(context, site),
             _sectionA(site),
             _sectionB(site),
             _sectionC(site),
@@ -894,6 +893,8 @@ class _SiteDetailPageState extends State<SiteDetailPage> {
           _row('1310nm', s.opticalLevelAtbPort1310nm != null ? '${s.opticalLevelAtbPort1310nm} dBm' : null),
           _row('1490nm', s.opticalLevelAtbPort1490nm != null ? '${s.opticalLevelAtbPort1490nm} dBm' : null),
           _row('Drop Cable', s.dropCableLengthInMeter != null ? '${s.dropCableLengthInMeter} m' : null),
+          _row('Start Meter', s.cableDrumStart != null ? '${s.cableDrumStart} m' : null),
+          _row('End Meter', s.cableDrumEnd != null ? '${s.cableDrumEnd} m' : null),
           _row('ROW Issue', s.rowIssue),
         ],
       ),
@@ -955,6 +956,7 @@ class _SiteDetailPageState extends State<SiteDetailPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _photoGroup('AN  Node', [g?.anNode], ['']),
+          _photoGroup('Map Image', [g?.mapImage], ['']),
           _photoGroup('D1  Before installation', [g?.d1_1, g?.d1_2], ['FAT Closed', 'FAT Open']),
           _photoGroup('D2  After installation', [g?.d2_1, g?.d2_2], ['View 1', 'View 2']),
           _photoGroup('D3  Cable label inside FAT', [g?.d3_1, g?.d3_2], ['Label 1', 'Label 2']),

@@ -356,29 +356,29 @@ class _SiteMapWidgetState extends State<SiteMapWidget> {
               child: Stack(
                 children: [
                   // ── Google Map ──────────────────────────────────────────────────
-                  gmaps.GoogleMap(
-                    initialCameraPosition: gmaps.CameraPosition(
-                      target: _initialCenter(),
-                      zoom: 15,
-                    ),
-                    markers: _markers,
-                    polylines: _polylines,
-                    myLocationButtonEnabled: false,
-                    zoomControlsEnabled: true,
-                    onMapCreated: (ctrl) async {
-                      if (widget.onMapCreated != null) {
-                        widget.onMapCreated!(ctrl);
-                      }
+                  // gmaps.GoogleMap(
+                  //   initialCameraPosition: gmaps.CameraPosition(
+                  //     target: _initialCenter(),
+                  //     zoom: 15,
+                  //   ),
+                  //   markers: _markers,
+                  //   polylines: _polylines,
+                  //   myLocationButtonEnabled: false,
+                  //   zoomControlsEnabled: true,
+                  //   onMapCreated: (ctrl) async {
+                  //     if (widget.onMapCreated != null) {
+                  //       widget.onMapCreated!(ctrl);
+                  //     }
 
-                      _controller.complete(ctrl);
-                      await _fitBounds();
-                      await _updateOverlayPositions();
-                    },
-                    onCameraMove: _onCameraMove,
-                    onCameraIdle: _onCameraIdle,
-                  ),
+                  //     _controller.complete(ctrl);
+                  //     await _fitBounds();
+                  //     await _updateOverlayPositions();
+                  //   },
+                  //   onCameraMove: _onCameraMove,
+                  //   onCameraIdle: _onCameraIdle,
+                  // ),
 
-                  // ── FAT info box ────────────────────────────────────────────────
+                  // // ── FAT info box ────────────────────────────────────────────────
                   if (showOverlays && _fatOffset != null && site.fatLat != null && site.fatLng != null)
                     Positioned(
                       left: _fatOffset!.dx + 12,

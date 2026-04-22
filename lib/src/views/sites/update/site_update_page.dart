@@ -30,6 +30,8 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
   // ── A ────────────────────────────────────────────────────────────────────
   final _circuitIdCtrl = TextEditingController();
   final _customerNameCtrl = TextEditingController();
+  final _startMeterController = TextEditingController();
+  final _endMeterController = TextEditingController();
   final _lspNameCtrl = TextEditingController();
   final _customerLatCtrl = TextEditingController();
   final _customerLngCtrl = TextEditingController();
@@ -84,6 +86,9 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
     if (model == null || !mounted) return;
 
     _circuitIdCtrl.text = model.circuitId;
+    _startMeterController.text = model.cableDrumStart?.toString() ?? '';
+
+    _endMeterController.text = model.cableDrumEnd?.toString() ?? '';
     _siteStatus = model.siteStatus;
     _customerNameCtrl.text = model.customerName ?? '';
     _lspNameCtrl.text = model.lspName ?? '';
@@ -119,6 +124,7 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
     if (g != null) {
       _existingUrls.addAll({
         'an_node': g.anNode,
+        'map_image': g.mapImage,
         'd1_1': g.d1_1,
         'd1_2': g.d1_2,
         'd2_1': g.d2_1,
@@ -436,6 +442,8 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
         ..opticalLevelAtbPort1310nm = double.tryParse(_optAtb1310Ctrl.text)
         ..opticalLevelAtbPort1490nm = double.tryParse(_optAtb1490Ctrl.text)
         ..dropCableLengthInMeter = _dropCableCtrl.text.trim().nullIfEmpty
+        ..cableDrumStart = double.tryParse(_startMeterController.text.trim())
+        ..cableDrumEnd = double.tryParse(_endMeterController.text.trim())
         ..rowIssue = _rowIssueCtrl.text.trim().nullIfEmpty
         ..ontSnNumber = _ontSnCtrl.text.trim().nullIfEmpty
         ..splitterNo = _splitterCtrl.text.trim().nullIfEmpty
@@ -449,6 +457,7 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
       final gallery = SiteGalleryModel(circuitId: circuitId);
       const allKeys = {
         'an_node',
+        'map_image',
         'd1_1',
         'd1_2',
         'd2_1',
@@ -615,6 +624,9 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
       case 'f6_2':
         g.f6_2 = url;
         break;
+      case 'map_image':
+        g.mapImage = url;
+        break;
     }
   }
 
@@ -760,7 +772,25 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
               Expanded(child: _labeledField(_optAtb1490Ctrl, '1490nm (dBm)', type: const TextInputType.numberWithOptions(decimal: true, signed: true))),
             ],
           ),
-          _labeledField(_dropCableCtrl, 'Drop Cable Length (m)', type: TextInputType.number),
+          Row(
+            children: [
+              Expanded(
+                child: _labeledField(_startMeterController, 'Start Meter', hint: ''),
+              ),
+              const SizedBox(
+                width: 8,
+              ),
+              Expanded(
+                child: _labeledField(_endMeterController, 'End Meter', hint: ''),
+              ),
+              const SizedBox(
+                width: 8,
+              ),
+              Expanded(
+                child: _labeledField(_dropCableCtrl, 'Drop Cable Length (m)', type: TextInputType.number),
+              ),
+            ],
+          ),
           _labeledField(_rowIssueCtrl, 'ROW Issue', hint: 'No Issue'),
         ],
       ),
@@ -871,6 +901,8 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
           const _SubLabel('AN  Node photo'),
           _keyedPhotoSlot('an_node', 'AN Node'),
           const SizedBox(height: 12),
+          const _SubLabel('Map Image'),
+          _keyedPhotoSlot('map_image', 'Map Image'),
           const _SubLabel('D1  FAT before installation'),
           _twoPhotoRow('d1_1', 'FAT Closed', 'd1_2', 'FAT Open'),
           const SizedBox(height: 12),

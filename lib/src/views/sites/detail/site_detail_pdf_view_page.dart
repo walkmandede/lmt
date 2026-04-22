@@ -22,7 +22,11 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> params) async {
 
   final mpt = params['imgMpt'] as Uint8List;
   final ksgm = params['imgKsgm'] as Uint8List;
-  final mapImg = params['mapImage'] as Uint8List?;
+  // final mapImg = params['mapImage'] as Uint8List?;
+  // for (var element in params.keys) {
+  //   print(element);
+  // }
+
   final circuitId = params['circuitId'] as String;
   final d4Bytes = (params['d4'] as List<dynamic>).cast<Uint8List>();
 
@@ -33,7 +37,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> params) async {
     return b == null ? null : pw.MemoryImage(b);
   }
 
-  String s(String key) => (params[key] as String?) ?? '-';
+  String s(String key) => (params[key]?.toString()) ?? '-';
 
   // ── Page 1: Cover ─────────────────────────────────────────────────────────
   doc.addPage(
@@ -143,10 +147,13 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> params) async {
             dataRow('8', 'ROW issue', s('rowIssue')),
             pw.SizedBox(height: 16),
             band('C', 'Cable Route Diagram'),
-            if (mapImg != null)
-              pw.Expanded(
-                child: pw.Center(child: pw.Image(pw.MemoryImage(mapImg), width: double.infinity)),
-              ),
+            pw.Expanded(
+              child: img('map_image') == null ? pw.SizedBox.expand() : pw.Image(img('map_image')!),
+            ),
+            // if (mapImgBytes != null)
+            // pw.Expanded(
+            //   child: pw.Center(child: pw.Image(pw.MemoryImage(mapImgBytes), width: double.infinity)),
+            // ),
             pageFooter(3),
           ],
         ),
@@ -1260,12 +1267,178 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> params) async {
   );
 
   // ── Page 10: Poles
+  pw.Widget polePageHeader(pw.Context context) {
+    return pw.Column(
+      children: [
+        pageFooter(context.pageNumber),
+        pw.Container(
+          width: double.infinity,
+          decoration: pw.BoxDecoration(
+            color: pdfColorBlue2,
+            border: pw.Border.all(
+              color: PdfColors.black,
+            ),
+          ),
+          padding: pw.EdgeInsets.all(8),
+          alignment: pw.Alignment.center,
+          child: txt('Cable Laying Check-list for Exisiting Pole'),
+        ),
+        pw.Container(
+          width: double.infinity,
+          decoration: pw.BoxDecoration(
+            color: PdfColors.yellow200,
+            border: pw.Border.all(
+              color: PdfColors.black,
+            ),
+          ),
+          alignment: pw.Alignment.center,
+          child: pw.Row(
+            children: [
+              pw.Expanded(
+                flex: 2,
+                child: pw.Container(
+                  width: double.infinity,
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(
+                      color: PdfColors.black,
+                    ),
+                  ),
+                  alignment: pw.Alignment.centerLeft,
+                  child: pw.Padding(
+                    padding: pw.EdgeInsets.all(8),
+                    child: txt('Link ID:'),
+                  ),
+                ),
+              ),
+              pw.Expanded(
+                flex: 3,
+                child: pw.Container(
+                  width: double.infinity,
+                  alignment: pw.Alignment.centerLeft,
+                  child: pw.Padding(
+                    padding: pw.EdgeInsets.all(8),
+                    child: txt(s('circuitId'), size: 8),
+                  ),
+                ),
+              ),
+              pw.Expanded(
+                flex: 2,
+                child: pw.Container(
+                  width: double.infinity,
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(
+                      color: PdfColors.black,
+                    ),
+                  ),
+                  alignment: pw.Alignment.centerLeft,
+                  child: pw.Padding(
+                    padding: pw.EdgeInsets.all(8),
+                    child: txt('Customer Name:'),
+                  ),
+                ),
+              ),
+              pw.Expanded(
+                flex: 3,
+                child: pw.Container(
+                  width: double.infinity,
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(
+                      color: PdfColors.black,
+                    ),
+                  ),
+                  alignment: pw.Alignment.centerLeft,
+                  child: pw.Padding(
+                    padding: pw.EdgeInsets.all(8),
+                    child: txt(s('customerName')),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        pw.Container(
+          width: double.infinity,
+          decoration: pw.BoxDecoration(
+            color: PdfColors.yellow200,
+            border: pw.Border.all(
+              color: PdfColors.black,
+            ),
+          ),
+          alignment: pw.Alignment.center,
+          child: pw.Row(
+            children: [
+              pw.Expanded(
+                flex: 2,
+                child: pw.Container(
+                  width: double.infinity,
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(
+                      color: PdfColors.black,
+                    ),
+                  ),
+                  alignment: pw.Alignment.centerLeft,
+                  child: pw.Padding(
+                    padding: pw.EdgeInsets.all(8),
+                    child: txt('LSP\'s Name:'),
+                  ),
+                ),
+              ),
+              pw.Expanded(
+                flex: 3,
+                child: pw.Container(
+                  width: double.infinity,
+                  alignment: pw.Alignment.centerLeft,
+                  child: pw.Padding(
+                    padding: pw.EdgeInsets.all(8),
+                    child: txt(s('lspName'), size: 10),
+                  ),
+                ),
+              ),
+              pw.Expanded(
+                flex: 2,
+                child: pw.Container(
+                  width: double.infinity,
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(
+                      color: PdfColors.black,
+                    ),
+                  ),
+                  alignment: pw.Alignment.centerLeft,
+                  child: pw.Padding(
+                    padding: pw.EdgeInsets.all(8),
+                    child: txt('Check Area:'),
+                  ),
+                ),
+              ),
+              pw.Expanded(
+                flex: 3,
+                child: pw.Container(
+                  width: double.infinity,
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(
+                      color: PdfColors.black,
+                    ),
+                  ),
+                  alignment: pw.Alignment.centerLeft,
+                  child: pw.Padding(
+                    padding: pw.EdgeInsets.all(8),
+                    child: txt(poles.isEmpty ? '-' : 'P_001 to P_${poles.length.toString().padLeft(3, '0')}'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   doc.addPage(
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      header: (context) => pageHeader(mpt, ksgm),
-      footer: (context) => pageFooter(context.pageNumber),
+      header: (context) => polePageHeader(context),
+      footer: (context) => pageHeader(mpt, ksgm),
       build: (context) {
         List rawPoles = [];
         final remainder = poles.length % 4;
@@ -1277,164 +1450,6 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> params) async {
           ),
         ];
         return [
-          pw.Container(
-            width: double.infinity,
-            decoration: pw.BoxDecoration(
-              color: pdfColorBlue2,
-              border: pw.Border.all(
-                color: PdfColors.black,
-              ),
-            ),
-            padding: pw.EdgeInsets.all(8),
-            alignment: pw.Alignment.center,
-            child: txt('Cable Laying Check-list for Exisiting Pole'),
-          ),
-          pw.Container(
-            width: double.infinity,
-            decoration: pw.BoxDecoration(
-              color: PdfColors.yellow200,
-              border: pw.Border.all(
-                color: PdfColors.black,
-              ),
-            ),
-            alignment: pw.Alignment.center,
-            child: pw.Row(
-              children: [
-                pw.Expanded(
-                  flex: 2,
-                  child: pw.Container(
-                    width: double.infinity,
-                    decoration: pw.BoxDecoration(
-                      border: pw.Border.all(
-                        color: PdfColors.black,
-                      ),
-                    ),
-                    alignment: pw.Alignment.centerLeft,
-                    child: pw.Padding(
-                      padding: pw.EdgeInsets.all(8),
-                      child: txt('Link ID:'),
-                    ),
-                  ),
-                ),
-                pw.Expanded(
-                  flex: 3,
-                  child: pw.Container(
-                    width: double.infinity,
-                    alignment: pw.Alignment.centerLeft,
-                    child: pw.Padding(
-                      padding: pw.EdgeInsets.all(8),
-                      child: txt(s('circuitId'), size: 8),
-                    ),
-                  ),
-                ),
-                pw.Expanded(
-                  flex: 2,
-                  child: pw.Container(
-                    width: double.infinity,
-                    decoration: pw.BoxDecoration(
-                      border: pw.Border.all(
-                        color: PdfColors.black,
-                      ),
-                    ),
-                    alignment: pw.Alignment.centerLeft,
-                    child: pw.Padding(
-                      padding: pw.EdgeInsets.all(8),
-                      child: txt('Customer Name:'),
-                    ),
-                  ),
-                ),
-                pw.Expanded(
-                  flex: 3,
-                  child: pw.Container(
-                    width: double.infinity,
-                    decoration: pw.BoxDecoration(
-                      border: pw.Border.all(
-                        color: PdfColors.black,
-                      ),
-                    ),
-                    alignment: pw.Alignment.centerLeft,
-                    child: pw.Padding(
-                      padding: pw.EdgeInsets.all(8),
-                      child: txt(s('customerName')),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          pw.Container(
-            width: double.infinity,
-            decoration: pw.BoxDecoration(
-              color: PdfColors.yellow200,
-              border: pw.Border.all(
-                color: PdfColors.black,
-              ),
-            ),
-            alignment: pw.Alignment.center,
-            child: pw.Row(
-              children: [
-                pw.Expanded(
-                  flex: 2,
-                  child: pw.Container(
-                    width: double.infinity,
-                    decoration: pw.BoxDecoration(
-                      border: pw.Border.all(
-                        color: PdfColors.black,
-                      ),
-                    ),
-                    alignment: pw.Alignment.centerLeft,
-                    child: pw.Padding(
-                      padding: pw.EdgeInsets.all(8),
-                      child: txt('LSP\'s Name:'),
-                    ),
-                  ),
-                ),
-                pw.Expanded(
-                  flex: 3,
-                  child: pw.Container(
-                    width: double.infinity,
-                    alignment: pw.Alignment.centerLeft,
-                    child: pw.Padding(
-                      padding: pw.EdgeInsets.all(8),
-                      child: txt(s('lspName'), size: 10),
-                    ),
-                  ),
-                ),
-                pw.Expanded(
-                  flex: 2,
-                  child: pw.Container(
-                    width: double.infinity,
-                    decoration: pw.BoxDecoration(
-                      border: pw.Border.all(
-                        color: PdfColors.black,
-                      ),
-                    ),
-                    alignment: pw.Alignment.centerLeft,
-                    child: pw.Padding(
-                      padding: pw.EdgeInsets.all(8),
-                      child: txt('Check Area:'),
-                    ),
-                  ),
-                ),
-                pw.Expanded(
-                  flex: 3,
-                  child: pw.Container(
-                    width: double.infinity,
-                    decoration: pw.BoxDecoration(
-                      border: pw.Border.all(
-                        color: PdfColors.black,
-                      ),
-                    ),
-                    alignment: pw.Alignment.centerLeft,
-                    child: pw.Padding(
-                      padding: pw.EdgeInsets.all(8),
-                      child: txt(poles.isEmpty ? '-' : 'P_001 to P_${poles.length.toString().padLeft(3, '0')}'),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
           pw.GridView(
             crossAxisCount: 2,
             childAspectRatio: 6 / 5,
@@ -1660,6 +1675,7 @@ class _SiteDetailPdfViewPageState extends State<SiteDetailPdfViewPage> {
     final g = _sd.gallery;
     return [
       ('anNode', g?.anNode),
+      ('map_image', g?.mapImage),
       // D
       ('d1_1', g?.d1_1), ('d1_2', g?.d1_2),
       ('d2_1', g?.d2_1), ('d2_2', g?.d2_2),

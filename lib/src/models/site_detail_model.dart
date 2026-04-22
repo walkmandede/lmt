@@ -114,6 +114,9 @@ class SiteGalleryModel {
   String? circuitId;
   String? anNode;
 
+  // ── Map image ─────────────────────────────────────────────────────────────
+  String? mapImage;
+
   String? d1_1;
   String? d1_2;
   String? d2_1;
@@ -146,6 +149,7 @@ class SiteGalleryModel {
   factory SiteGalleryModel.fromJson(Map<String, dynamic> json) {
     return SiteGalleryModel(circuitId: json['circuit_id'])
       ..anNode = json['an_node']
+      ..mapImage = json['map_image']
       ..d1_1 = json['d1_1']
       ..d1_2 = json['d1_2']
       ..d2_1 = json['d2_1']
@@ -174,6 +178,7 @@ class SiteGalleryModel {
 
   Map<String, dynamic> toJson() => {
     'an_node': anNode,
+    'map_image': mapImage,
     'circuit_id': circuitId,
     'd1_1': d1_1,
     'd1_2': d1_2,
@@ -204,6 +209,7 @@ class SiteGalleryModel {
   SiteGalleryModel copyWith({
     String? circuitId,
     String? anNode,
+    String? mapImage,
     String? d1_1,
     String? d1_2,
     String? d2_1,
@@ -231,6 +237,7 @@ class SiteGalleryModel {
   }) {
     return SiteGalleryModel(circuitId: circuitId ?? this.circuitId)
       ..anNode = anNode ?? this.anNode
+      ..mapImage = mapImage ?? this.mapImage
       ..d1_1 = d1_1 ?? this.d1_1
       ..d1_2 = d1_2 ?? this.d1_2
       ..d2_1 = d2_1 ?? this.d2_1

@@ -94,63 +94,9 @@ class _SiteCreatePageState extends State<SiteCreatePage> {
       ),
     );
     if (choice == null) return null;
-    if (choice == 'paste') return _readClipboardImage();
+    if (choice == 'paste') return null; // clipboard not implemented in create
     final src = choice == 'camera' ? ImageSource.camera : ImageSource.gallery;
     return _picker.pickImage(source: src, imageQuality: 80);
-  }
-
-  /// Reads an image from the system clipboard using super_clipboard.
-  Future<XFile?> _readClipboardImage() async {
-    // final clipboard = SystemClipboard.instance;
-    // if (clipboard == null) {
-    //   if (mounted) {
-    //     ScaffoldMessenger.of(context).showSnackBar(
-    //       const SnackBar(content: Text('Clipboard not available on this platform.')),
-    //     );
-    //   }
-    //   return null;
-    // }
-
-    // final reader = await clipboard.read();
-
-    // for (final format in [Formats.png, Formats.jpeg, Formats.gif, Formats.webp]) {
-    //   if (reader.canProvide(format)) {
-    //     final completer = Completer<XFile?>();
-    //     reader.getFile(format, (file) async {
-    //       try {
-    //         final bytes = await file.readAll();
-    //         final ext = format == Formats.png
-    //             ? 'png'
-    //             : format == Formats.jpeg
-    //             ? 'jpg'
-    //             : format == Formats.gif
-    //             ? 'gif'
-    //             : 'webp';
-    //         final mime = format == Formats.png
-    //             ? 'image/png'
-    //             : format == Formats.jpeg
-    //             ? 'image/jpeg'
-    //             : format == Formats.gif
-    //             ? 'image/gif'
-    //             : 'image/webp';
-    //         completer.complete(
-    //           XFile.fromData(bytes, name: 'pasted.$ext', mimeType: mime),
-    //         );
-    //       } catch (_) {
-    //         completer.complete(null);
-    //       }
-    //     }, onError: (_) => completer.complete(null));
-    //     final result = await completer.future;
-    //     if (result != null) return result;
-    //   }
-    // }
-
-    // if (mounted) {
-    //   ScaffoldMessenger.of(context).showSnackBar(
-    //     const SnackBar(content: Text('No image found in clipboard.')),
-    //   );
-    // }
-    return null;
   }
 
   Future<void> _pickGalleryImage(String key) async {
@@ -357,8 +303,9 @@ class _SiteCreatePageState extends State<SiteCreatePage> {
         ..checkArea = _checkAreaCtrl.text.trim().nullIfEmpty
         ..conclusionAndComments = _conclusionCtrl.text.trim().nullIfEmpty;
 
-      // ── Upload keyed single-slot gallery images ───────────────────────────
       final gallery = SiteGalleryModel(circuitId: circuitId);
+
+      // All keyed gallery images (includes map_image, an_node, d*, e*, f*)
       for (final key in _gallery.keys) {
         final file = _gallery[key];
         if (file == null) continue;
@@ -370,18 +317,7 @@ class _SiteCreatePageState extends State<SiteCreatePage> {
         _setGalleryUrl(gallery, key, url);
       }
 
-      // ── Upload AN node image ──────────────────────────────────────────────
-      final anFile = _gallery['an_node'];
-      if (anFile != null) {
-        final url = await _storage.uploadImage(
-          circuitId: circuitId,
-          bytes: await anFile.readAsBytes(),
-          folder: 'an_node',
-        );
-        gallery.anNode = url;
-      }
-
-      // ── Upload D4 accessories images (dynamic list) ───────────────────────
+      // D4 dynamic list
       final d4Urls = <String>[];
       for (int i = 0; i < _d4Images.length; i++) {
         final url = await _storage.uploadImage(
@@ -395,7 +331,7 @@ class _SiteCreatePageState extends State<SiteCreatePage> {
 
       model.gallery = gallery;
 
-      // ── Upload pole images and build pole list ────────────────────────────
+      // Poles
       model.poles = await Future.wait(
         _poles.asMap().entries.map((e) async {
           final index = e.key;
@@ -434,6 +370,12 @@ class _SiteCreatePageState extends State<SiteCreatePage> {
 
   void _setGalleryUrl(SiteGalleryModel g, String key, String? url) {
     switch (key) {
+      case 'an_node':
+        g.anNode = url;
+        break;
+      case 'map_image':
+        g.mapImage = url;
+        break;
       case 'd1_1':
         g.d1_1 = url;
         break;
@@ -651,11 +593,7 @@ class _SiteCreatePageState extends State<SiteCreatePage> {
           ),
           DropdownButtonFormField<EnumPoleType>(
             initialValue: entry.type,
-            decoration: const InputDecoration(
-              labelText: 'Pole Type',
-              isDense: true,
-              border: OutlineInputBorder(),
-            ),
+            decoration: const InputDecoration(labelText: 'Pole Type', isDense: true, border: OutlineInputBorder()),
             items: EnumPoleType.values.map((t) => DropdownMenuItem(value: t, child: Text(t.name.toUpperCase()))).toList(),
             onChanged: (v) => setState(() => entry.type = v),
           ),
@@ -707,6 +645,10 @@ class _SiteCreatePageState extends State<SiteCreatePage> {
         children: [
           const _SubLabel('AN  Node photo'),
           _keyedPhotoSlot('an_node', 'AN Node'),
+          const SizedBox(height: 12),
+          // ── Map Image ──────────────────────────────────────────────────────
+          const _SubLabel('Map Image'),
+          _keyedPhotoSlot('map_image', 'Map / Route screenshot'),
           const SizedBox(height: 12),
           const _SubLabel('D1  FAT before installation'),
           _twoPhotoRow('d1_1', 'FAT Closed', 'd1_2', 'FAT Open'),
@@ -831,7 +773,7 @@ class _SiteCreatePageState extends State<SiteCreatePage> {
   }
 }
 
-// ── Pole entry data holder ────────────────────────────────────────────────────
+// ── Pole entry ────────────────────────────────────────────────────────────────
 
 class _PoleEntry {
   EnumPoleType? type = EnumPoleType.other;

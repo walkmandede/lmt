@@ -59,7 +59,7 @@ class SupabaseSiteService {
           .from('site_details')
           .select(
             'circuit_id, customer_name, lsp_name, created_at, survey_result, site_status, '
-            'site_gallery(an_node,d1_1,d1_2,d2_1,d2_2,d3_1,d3_2,d4,'
+            'site_gallery(an_node,map_image,d1_1,d1_2,d2_1,d2_2,d3_1,d3_2,d4,'
             'e1,e2,e3,e4_1,e4_2,e5,e6_1,e6_2,e6_3,'
             'f1,f2,f3,f4_1,f4_2,f5,f6_1,f6_2), '
             'site_poles(id,image)',
@@ -75,7 +75,7 @@ class SupabaseSiteService {
     String? search,
     String sortField = 'created_at',
     bool sortAsc = false,
-    List<String>? statusFilter, // <-- new
+    List<String>? statusFilter,
   }) async {
     final from = page * limit;
     final to = from + limit - 1;
@@ -84,7 +84,7 @@ class SupabaseSiteService {
         .from('site_details')
         .select(
           'circuit_id, customer_name, lsp_name, created_at, survey_result, site_status, '
-          'site_gallery(an_node,d1_1,d1_2,d2_1,d2_2,d3_1,d3_2,d4,'
+          'site_gallery(an_node,map_image,d1_1,d1_2,d2_1,d2_2,d3_1,d3_2,d4,'
           'e1,e2,e3,e4_1,e4_2,e5,e6_1,e6_2,e6_3,'
           'f1,f2,f3,f4_1,f4_2,f5,f6_1,f6_2), '
           'site_poles(id,image)',
@@ -119,7 +119,6 @@ class SupabaseSiteService {
   // ─── POLES ───────────────────────────────────────────────────────────────
 
   Future<void> savePoles(String circuitId, List<SitePoleModel> poles) async {
-    // Delete existing then re-insert so order is preserved
     await client.from('site_poles').delete().eq('circuit_id', circuitId);
 
     if (poles.isEmpty) return;
@@ -127,7 +126,7 @@ class SupabaseSiteService {
     final rows = poles.map((p) {
       final j = p.toJson();
       j['circuit_id'] = circuitId;
-      j.remove('id'); // let Supabase generate id on insert
+      j.remove('id');
       return j;
     }).toList();
 
