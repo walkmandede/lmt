@@ -58,7 +58,16 @@ class SupabaseSiteService {
       await client
           .from('site_details')
           .select(
-            'circuit_id, customer_name, lsp_name, created_at, survey_result, site_status, '
+            'circuit_id, customer_name, lsp_name, created_at, site_status, '
+            'survey_result, survey_result_datetime, '
+            'customer_lat, customer_lng, '
+            'work_order_datetime, activation_datetime, '
+            'fat_name, fat_port_number, fat_lat, fat_lng, '
+            'optical_level_fat_port_1310nm, optical_level_fat_port_1490nm, '
+            'optical_level_atb_port_1310nm, optical_level_atb_port_1490nm, '
+            'drop_cable_length, cable_drum_start, cable_drum_end, '
+            'row_issue, ont_sn_number, splitter_no, wifi_ssid, '
+            'msan, link_id, pole_range, check_area, conclusion, '
             'site_gallery(an_node,map_image,d1_1,d1_2,d2_1,d2_2,d3_1,d3_2,d4,'
             'e1,e2,e3,e4_1,e4_2,e5,e6_1,e6_2,e6_3,'
             'f1,f2,f3,f4_1,f4_2,f5,f6_1,f6_2), '
@@ -83,7 +92,16 @@ class SupabaseSiteService {
     var query = client
         .from('site_details')
         .select(
-          'circuit_id, customer_name, lsp_name, created_at, survey_result, site_status, '
+          'circuit_id, customer_name, lsp_name, created_at, site_status, '
+          'survey_result, survey_result_datetime, '
+          'customer_lat, customer_lng, '
+          'work_order_datetime, activation_datetime, '
+          'fat_name, fat_port_number, fat_lat, fat_lng, '
+          'optical_level_fat_port_1310nm, optical_level_fat_port_1490nm, '
+          'optical_level_atb_port_1310nm, optical_level_atb_port_1490nm, '
+          'drop_cable_length, cable_drum_start, cable_drum_end, '
+          'row_issue, ont_sn_number, splitter_no, wifi_ssid, '
+          'msan, link_id, pole_range, check_area, conclusion, '
           'site_gallery(an_node,map_image,d1_1,d1_2,d2_1,d2_2,d3_1,d3_2,d4,'
           'e1,e2,e3,e4_1,e4_2,e5,e6_1,e6_2,e6_3,'
           'f1,f2,f3,f4_1,f4_2,f5,f6_1,f6_2), '

@@ -50,9 +50,13 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> params, Uint8List? mapTableImag
           children: [
             pageHeader(mpt, ksgm),
             pw.SizedBox(height: 16),
-            txt('Galaxia @ Net CO.,LTD'.toUpperCase(), size: 18, color: pdfColorBlue1),
+            pw.Text(
+              'Galaxia @ Net CO.,LTD'.toUpperCase(),
+              style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, color: pdfColorBlue1),
+            ),
+
             pw.SizedBox(height: 32),
-            txt('MPT-KSGM FTTH Project'.toUpperCase(), size: 18),
+            txt('MPT-KSGM POTS Project'.toUpperCase(), size: 18),
             pw.SizedBox(height: 32),
             txt('Circuit ID: $circuitId', size: 18),
             pw.SizedBox(height: 32),
@@ -141,8 +145,8 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> params, Uint8List? mapTableImag
             dataRow('2', 'FAT Name', s('fatName')),
             dataRow('3', 'FAT Port No', s('fatPortNumber')),
             dataRow2('4', 'FAT Location (Coordinates)', 'Lat', s('fatLat').formatDecimal(), 'Long', s('fatLng').formatDecimal()),
-            dataRow2('5', 'Optical Level at FAT port', '1310nm', s('opticalLevelFatPort1310nm'), '1490nm', s('opticalLevelFatPort1490nm')),
-            dataRow2('6', 'Optical Level at ATB port', '1310nm', s('opticalLevelAtbPort1310nm'), '1490nm', s('opticalLevelAtbPort1490nm')),
+            dataRow2('5', 'Optical Level at FAT port', '1310nm', '${s('opticalLevelFatPort1310nm')} dBM', '1490nm', '${s('opticalLevelFatPort1490nm')} dBm'),
+            dataRow2('6', 'Optical Level at ATB port', '1310nm', '${s('opticalLevelAtbPort1310nm')} dBM', '1490nm', '${s('opticalLevelAtbPort1490nm')} dBM'),
             dataRow('7', 'Drop Cable Length (m)', s('dropCableLengthInMeter')),
             dataRow('8', 'ROW issue', s('rowIssue')),
             pw.SizedBox(height: 16),
@@ -153,7 +157,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> params, Uint8List? mapTableImag
                   : pw.Column(
                       children: [
                         pw.Expanded(
-                          flex: 5,
+                          flex: 7,
                           child: pw.Image(
                             img('map_image')!,
                             fit: pw.BoxFit.cover,
@@ -886,7 +890,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> params, Uint8List? mapTableImag
                         child: pw.Column(
                           crossAxisAlignment: pw.CrossAxisAlignment.start,
                           children: [
-                            txt('Other Remark: ${s('cableDrumEnd')} - ${s('cableDrumStart')} = ${s('dropCableLengthInMeter')}m'),
+                            txt('Other Remark: ${s('cableDrumStart')} - ${s('cableDrumEnd')} = ${s('dropCableLengthInMeter')}m'),
                             pw.Expanded(
                               child: pw.Row(
                                 children: [
@@ -1212,7 +1216,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> params, Uint8List? mapTableImag
                           children: [
                             txt('Internet Service test (Speed Test)'),
                             pw.Expanded(
-                              child: img('f5') == null ? pw.SizedBox.shrink() : pw.Center(child: pw.Image(img('f5')!)),
+                              child: img('f5') == null ? pw.SizedBox.shrink() : pw.Align(alignment: pw.Alignment.centerLeft, child: pw.Image(img('f5')!)),
                             ),
                           ],
                         ),
@@ -1339,7 +1343,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> params, Uint8List? mapTableImag
                   alignment: pw.Alignment.centerLeft,
                   child: pw.Padding(
                     padding: pw.EdgeInsets.all(8),
-                    child: txt(s('circuitId'), size: 8),
+                    child: pw.FittedBox(child: txt(s('circuitId'))),
                   ),
                 ),
               ),
@@ -1371,7 +1375,9 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> params, Uint8List? mapTableImag
                   alignment: pw.Alignment.centerLeft,
                   child: pw.Padding(
                     padding: pw.EdgeInsets.all(8),
-                    child: txt(s('customerName')),
+                    child: txt(
+                      s('customerName'),
+                    ),
                   ),
                 ),
               ),
@@ -1772,6 +1778,7 @@ class _SiteDetailPdfViewPageState extends State<SiteDetailPdfViewPage> {
       'imgMpt': imgMptData.buffer.asUint8List(),
       'imgKsgm': imgKsgmData.buffer.asUint8List(),
       'mapImage': widget.mapTableImage,
+      'customerName': _sd.customerName,
       // Text fields
       'circuitId': _sd.circuitId,
       'cableDrumStart': _sd.cableDrumStart,

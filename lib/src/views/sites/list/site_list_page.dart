@@ -294,12 +294,95 @@ class _SiteListPageState extends State<SiteListPage> {
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
+  /// Returns a list of (label, isFilled) pairs for all tracked fields.
+  // ── Field completion helper ───────────────────────────────────────────────
+
+  List<({String label, bool filled})> _allFields(Map<String, dynamic> s) {
+    final g = s['site_gallery'] as Map<String, dynamic>?;
+
+    bool str(String k) {
+      final v = s[k];
+      return v != null && v.toString().trim().isNotEmpty;
+    }
+
+    bool num_(String k) => s[k] != null;
+
+    bool gal(String k) {
+      if (g == null) return false;
+      final v = g[k];
+      if (v is List) return v.isNotEmpty;
+      return v != null;
+    }
+
+    bool hasFatLoc = num_('fat_lat') && num_('fat_lng');
+    bool hasCustomLoc = num_('customer_lat') && num_('customer_lng');
+    bool hasDrumRange = num_('cable_drum_start') && num_('cable_drum_end');
+    bool hasOptFat = num_('optical_level_fat_port_1310nm') && num_('optical_level_fat_port_1490nm');
+    bool hasOptAtb = num_('optical_level_atb_port_1310nm') && num_('optical_level_atb_port_1490nm');
+
+    return [
+      // ── Site info ──────────────────────────────────────────────────────
+      (label: 'Customer', filled: str('customer_name')),
+      (label: 'LSP', filled: str('lsp_name')),
+      (label: 'Customer Loc', filled: hasCustomLoc),
+      (label: 'Work Order', filled: num_('work_order_datetime')),
+      (label: 'Activation', filled: num_('activation_datetime')),
+      (label: 'Survey Date', filled: num_('survey_result_datetime')),
+      (label: 'Survey Result', filled: str('survey_result')),
+      // ── FAT ────────────────────────────────────────────────────────────
+      (label: 'FAT Name', filled: str('fat_name')),
+      (label: 'FAT Port', filled: str('fat_port_number')),
+      (label: 'FAT Loc', filled: hasFatLoc),
+      (label: 'Opt FAT', filled: hasOptFat),
+      (label: 'Opt ATB', filled: hasOptAtb),
+      // ── Cable ──────────────────────────────────────────────────────────
+      (label: 'Drop Cable', filled: str('drop_cable_length')),
+      (label: 'Drum Range', filled: hasDrumRange),
+      (label: 'Pole Range', filled: str('pole_range')),
+      (label: 'ROW Issue', filled: str('row_issue')),
+      // ── Equipment ──────────────────────────────────────────────────────
+      (label: 'ONT S/N', filled: str('ont_sn_number')),
+      (label: 'Splitter', filled: str('splitter_no')),
+      (label: 'WiFi SSID', filled: str('wifi_ssid')),
+      (label: 'MSAN', filled: str('msan')),
+      (label: 'Link ID', filled: str('link_id')),
+      (label: 'Check Area', filled: str('check_area')),
+      (label: 'Conclusion', filled: str('conclusion')),
+      // ── Gallery ────────────────────────────────────────────────────────
+      (label: 'AN Node', filled: gal('an_node')),
+      (label: 'Map', filled: gal('map_image')),
+      (label: 'D1-1', filled: gal('d1_1')),
+      (label: 'D1-2', filled: gal('d1_2')),
+      (label: 'D2-1', filled: gal('d2_1')),
+      (label: 'D2-2', filled: gal('d2_2')),
+      (label: 'D3-1', filled: gal('d3_1')),
+      (label: 'D3-2', filled: gal('d3_2')),
+      (label: 'D4', filled: gal('d4')),
+      (label: 'E1', filled: gal('e1')),
+      (label: 'E2', filled: gal('e2')),
+      (label: 'E3', filled: gal('e3')),
+      (label: 'E4-1', filled: gal('e4_1')),
+      (label: 'E4-2', filled: gal('e4_2')),
+      (label: 'E5', filled: gal('e5')),
+      (label: 'E6-1', filled: gal('e6_1')),
+      (label: 'E6-2', filled: gal('e6_2')),
+      (label: 'E6-3', filled: gal('e6_3')),
+      (label: 'F1', filled: gal('f1')),
+      (label: 'F2', filled: gal('f2')),
+      (label: 'F3', filled: gal('f3')),
+      (label: 'F4-1', filled: gal('f4_1')),
+      (label: 'F4-2', filled: gal('f4_2')),
+      (label: 'F5', filled: gal('f5')),
+      (label: 'F6-1', filled: gal('f6_1')),
+      (label: 'F6-2', filled: gal('f6_2')),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('FTTH Sites - v(1.0.8)'),
+        title: const Text('FTTH Sites - v(1.0.9)'),
         actions: [
           // Sort / filter button with active badge
           Stack(
@@ -481,58 +564,101 @@ class _SiteListPageState extends State<SiteListPage> {
   Widget _buildItem(Map<String, dynamic> site) {
     final c = _counts(site);
     final status = EnumSiteStatusX.fromDb(site['site_status'] as String?);
+    final fields = _allFields(site);
+    final doneCount = fields.where((f) => f.filled).length;
+    final total = fields.length;
 
-    return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: status?.badgeColor ?? Colors.blueGrey,
-        child: const Icon(Icons.cell_tower, color: Colors.white, size: 18),
-      ),
-      title: Row(
-        children: [
-          Expanded(
-            child: Text(
-              site['circuit_id'] ?? '',
-              style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold),
-            ),
-          ),
-          SiteStatusBadge(status: status),
-        ],
-      ),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (site['customer_name'] != null) Text(site['customer_name']),
-          if (site['lsp_name'] != null) Text(site['lsp_name'], style: const TextStyle(fontSize: 12, color: Colors.grey)),
-          const SizedBox(height: 3),
-          Row(
-            children: [
-              Icon(Icons.photo_library_outlined, size: 13, color: Colors.blueGrey.shade400),
-              const SizedBox(width: 3),
-              Text('${c.images} photos', style: TextStyle(fontSize: 11, color: Colors.blueGrey.shade400)),
-              const SizedBox(width: 10),
-              Icon(Icons.cell_tower, size: 13, color: Colors.blueGrey.shade400),
-              const SizedBox(width: 3),
-              Text('${c.poles} poles  (${c.polesWithImage} with photo)', style: TextStyle(fontSize: 11, color: Colors.blueGrey.shade400)),
-            ],
-          ),
-        ],
-      ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Quick status update button
-          IconButton(
-            icon: const Icon(Icons.swap_horiz, size: 20),
-            tooltip: 'Update Status',
-            onPressed: () => _showStatusPicker(site['circuit_id'] as String, status),
-          ),
-          const Icon(Icons.chevron_right),
-        ],
-      ),
+    return InkWell(
       onTap: () async {
         await Navigator.pushNamed(context, '/detail', arguments: site['circuit_id']);
         _refresh();
       },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Title row ──────────────────────────────────────────────
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 16,
+                  backgroundColor: status?.badgeColor ?? Colors.blueGrey,
+                  child: const Icon(Icons.cell_tower, color: Colors.white, size: 14),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    site['circuit_id'] ?? '',
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+                SiteStatusBadge(status: status),
+                const SizedBox(width: 4),
+                IconButton(
+                  icon: const Icon(Icons.swap_horiz, size: 18),
+                  tooltip: 'Update Status',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: () => _showStatusPicker(site['circuit_id'] as String, status),
+                ),
+              ],
+            ),
+            // ── Customer / LSP ─────────────────────────────────────────
+            if (site['customer_name'] != null) ...[
+              const SizedBox(height: 2),
+              Text(site['customer_name'], style: const TextStyle(fontSize: 12)),
+            ],
+            if (site['lsp_name'] != null)
+              Text(
+                site['lsp_name'],
+                style: const TextStyle(fontSize: 11, color: Colors.grey),
+              ),
+            const SizedBox(height: 4),
+            // ── Stats row ──────────────────────────────────────────────
+            Row(
+              children: [
+                Icon(Icons.photo_library_outlined, size: 12, color: Colors.blueGrey.shade400),
+                const SizedBox(width: 3),
+                Text('${c.images} photos', style: TextStyle(fontSize: 10, color: Colors.blueGrey.shade400)),
+                const SizedBox(width: 10),
+                Icon(Icons.cell_tower, size: 12, color: Colors.blueGrey.shade400),
+                const SizedBox(width: 3),
+                Text('${c.poles} poles (${c.polesWithImage} w/ photo)', style: TextStyle(fontSize: 10, color: Colors.blueGrey.shade400)),
+                const Spacer(),
+                Text(
+                  '$doneCount / $total fields',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: doneCount == total ? Colors.green.shade600 : Colors.grey.shade500,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            // ── Progress bar ───────────────────────────────────────────
+            ClipRRect(
+              borderRadius: BorderRadius.circular(2),
+              child: LinearProgressIndicator(
+                value: doneCount / total,
+                minHeight: 3,
+                backgroundColor: Colors.grey.shade200,
+                valueColor: AlwaysStoppedAnimation(
+                  doneCount == total ? Colors.green.shade500 : Colors.green.shade300,
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            // ── Field chips ────────────────────────────────────────────
+            _SiteFieldChips(fields: fields),
+          ],
+        ),
+      ),
     );
   }
 
@@ -663,6 +789,60 @@ class _FilterChip extends StatelessWidget {
       visualDensity: VisualDensity.compact,
       padding: EdgeInsets.zero,
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+  }
+}
+
+class _SiteFieldChips extends StatelessWidget {
+  final List<({String label, bool filled})> fields;
+  const _SiteFieldChips({required this.fields});
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 4,
+      runSpacing: 4,
+      children: fields.map((f) => _FieldChip(label: f.label, filled: f.filled)).toList(),
+    );
+  }
+}
+
+class _FieldChip extends StatelessWidget {
+  final String label;
+  final bool filled;
+  const _FieldChip({required this.label, required this.filled});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: filled ? Colors.green.shade50 : Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(
+          color: filled ? Colors.green.shade300 : Colors.grey.shade300,
+          width: 0.8,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            filled ? Icons.check : Icons.remove,
+            size: 9,
+            color: filled ? Colors.green.shade600 : Colors.grey.shade400,
+          ),
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w500,
+              color: filled ? Colors.green.shade800 : Colors.grey.shade600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

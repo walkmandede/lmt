@@ -354,6 +354,21 @@ class _SiteCreatePageState extends State<SiteCreatePage> {
         }),
       );
 
+      // ── FAT → 1st pole sync (Create) ─────────────────────────────────────
+      final fatLat = model.fatLat;
+      final fatLng = model.fatLng;
+      if (fatLat != null && fatLng != null) {
+        // Case 1: FAT location provided — prepend MPT pole at index 0
+        final fatPole = SitePoleModel(
+          circuitId: circuitId,
+          enumPoleType: EnumPoleType.mpt,
+          lat: fatLat,
+          lng: fatLng,
+        );
+        model.poles = [fatPole, ...?model.poles];
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
       await _repo.saveSite(model);
 
       if (mounted) Navigator.pop(context);

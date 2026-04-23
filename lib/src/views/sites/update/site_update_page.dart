@@ -543,6 +543,42 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
         }),
       );
 
+      // ── FAT → 1st pole sync (Update) ─────────────────────────────────────
+      final newFatLat = model.fatLat;
+      final newFatLng = model.fatLng;
+      final oldFatLat = _siteDetailModel?.fatLat;
+      final oldFatLng = _siteDetailModel?.fatLng;
+
+      final fatExists = newFatLat != null && newFatLng != null;
+      final fatWasAbsent = oldFatLat == null || oldFatLng == null;
+      final fatChanged = fatExists && (newFatLat != oldFatLat || newFatLng != oldFatLng);
+
+      if (fatExists && fatWasAbsent) {
+        // Case 2: FAT location newly added — insert MPT pole at index 0
+        final fatPole = SitePoleModel(
+          circuitId: circuitId,
+          enumPoleType: EnumPoleType.mpt,
+          lat: newFatLat,
+          lng: newFatLng,
+        );
+        model.poles = [fatPole, ...?model.poles];
+      } else if (fatChanged) {
+        // Case 3: FAT location updated — update 1st pole lat/lng in place
+        final poles = List<SitePoleModel>.from(model.poles ?? []);
+        if (poles.isNotEmpty) {
+          poles[0] = SitePoleModel(
+            id: poles[0].id,
+            circuitId: circuitId,
+            enumPoleType: poles[0].enumPoleType ?? EnumPoleType.mpt,
+            lat: newFatLat,
+            lng: newFatLng,
+            image: poles[0].image,
+          );
+          model.poles = poles;
+        }
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
       await _repo.saveSite(model);
 
       if (mounted) Navigator.pop(context);
@@ -810,82 +846,131 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
     final size = MediaQuery.of(context).size;
     final minSize = min(size.height, size.width);
     superPrint('map rebuilt');
-    return SizedBox(
-      width: minSize * 0.55,
-      height: minSize * 0.35,
-      child: DecoratedBox(
-        decoration: BoxDecoration(border: Border.all()),
-        child: FlutterMap(
-          mapController: _flutterMapController,
-          options: MapOptions(
-            initialCenter:
-                _siteDetailModel?.customerLatLng ?? _siteDetailModel?.fatLatLng ?? _siteDetailModel?.poles?.firstOrNull?.location ?? LatLng(16.1216, 96.125),
-            initialZoom: 14,
-          ),
-          children: [
-            TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'LMT',
-            ),
-            MarkerLayer(
-              markers: [
-                //cus
-                if (_siteDetailModel?.customerLatLng != null)
-                  Marker(
-                    point: _siteDetailModel!.customerLatLng!,
-                    child: Center(
-                      child: Icon(
-                        Icons.home,
-                        color: Colors.green,
-                      ),
-                    ),
-                  ),
-                if (_siteDetailModel?.fatLatLng != null)
-                  Marker(
-                    point: _siteDetailModel!.fatLatLng!,
-                    child: Center(
-                      child: Icon(
-                        Icons.router,
-                        color: Colors.green,
-                      ),
-                    ),
-                  ),
-                ...(_poles).where((p) => p.hasLocation).map((p) {
-                  final index = _poles.indexOf(p);
-                  return Marker(
-                    point: p.location!,
-                    child: Card(
-                      color: Colors.black.withAlpha(155),
-                      child: FittedBox(
-                        child: Text(
-                          'P_${(index + 1).toString().padLeft(3, '0')}',
-                          style: TextStyle(fontSize: 10, color: Colors.white),
+    final newCusLat = double.tryParse(_customerLatCtrl.text);
+    final newCusLng = double.tryParse(_customerLngCtrl.text);
+    final newFatLat = double.tryParse(_fatLatCtrl.text);
+    final newFatLng = double.tryParse(_fatLngCtrl.text);
+    //cus
+    LatLng? cusLoc;
+    if (newCusLng != null && newCusLat != null) {
+      cusLoc = LatLng(newCusLat, newCusLng);
+    } else if (_siteDetailModel?.customerLatLng != null) {
+      cusLoc = _siteDetailModel?.customerLatLng;
+    }
+
+    //cus
+    LatLng? fatLoc;
+    if (newFatLng != null && newFatLat != null) {
+      fatLoc = LatLng(newFatLat, newFatLng);
+    } else if (_siteDetailModel?.fatLatLng != null) {
+      fatLoc = _siteDetailModel?.fatLatLng;
+    }
+
+    //poles
+    final polesWithLocations = (_poles).where((p) => p.hasLocation);
+    superPrint(cusLoc);
+    superPrint(fatLoc);
+
+    return Column(
+      children: [
+        TextButton(
+          onPressed: () async {
+            late LatLng des;
+            if (_siteDetailModel?.customerLatLng != null) {
+              des = _siteDetailModel!.customerLatLng!;
+            } else if (_siteDetailModel?.fatLatLng != null) {
+              des = _siteDetailModel!.fatLatLng!;
+            } else if (polesWithLocations.isNotEmpty) {
+              des = (_poles).where((p) => p.hasLocation).first.location!;
+            }
+            _flutterMapController.move(des, 12);
+            setState(() {});
+          },
+          child: Text('Refresh Map'),
+        ),
+        SizedBox(
+          width: minSize * 0.55,
+          height: minSize * 0.35,
+          child: DecoratedBox(
+            decoration: BoxDecoration(border: Border.all()),
+            child: FlutterMap(
+              mapController: _flutterMapController,
+              options: MapOptions(
+                initialCenter:
+                    _siteDetailModel?.customerLatLng ??
+                    _siteDetailModel?.fatLatLng ??
+                    _siteDetailModel?.poles?.firstOrNull?.location ??
+                    LatLng(16.1216, 96.125),
+                initialZoom: 14,
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'LMT',
+                ),
+                MarkerLayer(
+                  markers: [
+                    //cus
+                    if (cusLoc != null)
+                      Marker(
+                        point: cusLoc,
+                        child: Center(
+                          child: Icon(
+                            Icons.home,
+                            color: Colors.green,
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                }),
-              ],
-            ),
-            //line
-            PolylineLayer(
-              polylines: [
-                Polyline(
-                  color: Colors.blue,
-                  strokeWidth: 2,
-                  points: [
-                    if (_siteDetailModel?.customerLatLng != null) _siteDetailModel!.customerLatLng!,
-                    if (_siteDetailModel?.fatLatLng != null) _siteDetailModel!.fatLatLng!,
-                    ...(_poles).where((p) => p.hasLocation).map((p) {
-                      return p.location!;
+                    if (fatLoc != null)
+                      Marker(
+                        point: fatLoc,
+                        child: Center(
+                          child: Icon(
+                            Icons.router,
+                            color: Colors.green,
+                          ),
+                        ),
+                      ),
+                    ...polesWithLocations.map((p) {
+                      final index = _poles.indexOf(p);
+                      return Marker(
+                        point: p.location!,
+                        child: Card(
+                          color: Colors.black.withAlpha(155),
+                          child: FittedBox(
+                            child: Text(
+                              'P_${(index + 1).toString().padLeft(3, '0')}',
+                              style: TextStyle(fontSize: 10, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      );
                     }),
                   ],
                 ),
+
+                //line
+                if (cusLoc != null && fatLoc != null && polesWithLocations.isNotEmpty)
+                  PolylineLayer(
+                    polylines: [
+                      Polyline(
+                        color: Colors.blue,
+                        strokeWidth: 2,
+                        points: [
+                          cusLoc,
+                          ...polesWithLocations.map((p) {
+                            return p.location!;
+                          }),
+                          fatLoc,
+                        ],
+                      ),
+                    ],
+                  ),
               ],
             ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 
