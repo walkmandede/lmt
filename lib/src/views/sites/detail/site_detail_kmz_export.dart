@@ -1,4 +1,5 @@
 import 'package:archive/archive.dart';
+import 'package:flutter/material.dart';
 import 'dart:typed_data';
 
 import 'package:lmt/src/models/site_detail_model.dart';
@@ -15,7 +16,7 @@ class SiteDetailKMZExport {
     double? customerLng,
     double? fatLat,
     double? fatLng,
-    List<({String? id, double? lat, double? lng})>? poles,
+    List<({String? id, double? lat, double? lng, String? type})>? poles,
   }) {
     final StringBuffer kml = StringBuffer();
 
@@ -28,7 +29,7 @@ class SiteDetailKMZExport {
       <IconStyle>
         <scale>1.0</scale>
         <Icon>
-          <href>https://maps.google.com/mapfiles/kml/pushpin/blue-pushpin.png</href>
+          <href>https://zbqpdaedcztawcmwxqkh.supabase.co/storage/v1/object/public/site-images/_statics/cus_pin.png</href>
         </Icon>
       </IconStyle>
     </Style>
@@ -36,7 +37,7 @@ class SiteDetailKMZExport {
       <IconStyle>
         <scale>1.0</scale>
         <Icon>
-          <href>https://maps.google.com/mapfiles/kml/pushpin/red-pushpin.png</href>
+          <href>https://zbqpdaedcztawcmwxqkh.supabase.co/storage/v1/object/public/site-images/_statics/fat_pin.png</href>
         </Icon>
       </IconStyle>
     </Style>
@@ -44,13 +45,13 @@ class SiteDetailKMZExport {
       <IconStyle>
         <scale>0.8</scale>
         <Icon>
-          <href>https://maps.google.com/mapfiles/kml/pushpin/grn-pushpin.png</href>
+          <href></href>
         </Icon>
       </IconStyle>
     </Style>
     <Style id="polylineStyle">
       <LineStyle>
-        <color>ff0099ff</color>
+        <color>ff0000ff</color>
         <width>3</width>
       </LineStyle>
     </Style>
@@ -62,7 +63,7 @@ class SiteDetailKMZExport {
     if (customerLat != null && customerLng != null) {
       kml.write('''
       <Placemark>
-        <name>Customer: ${customerName ?? 'N/A'}</name>
+        <name>$circuitId</name>
         <styleUrl>#customerStyle</styleUrl>
         <Point>
           <coordinates>$customerLng,$customerLat</coordinates>
@@ -75,7 +76,7 @@ class SiteDetailKMZExport {
     if (fatLat != null && fatLng != null) {
       kml.write('''
       <Placemark>
-        <name>FAT: ${fatName ?? 'N/A'}</name>
+        <name>${fatName ?? 'N/A'}</name>
         <styleUrl>#fatStyle</styleUrl>
         <Point>
           <coordinates>$fatLng,$fatLat</coordinates>
@@ -91,7 +92,7 @@ class SiteDetailKMZExport {
         if (pole.lat != null && pole.lng != null) {
           kml.write('''
       <Placemark>
-        <name>Pole ${i + 1}${pole.id != null ? ' (${pole.id})' : ''}</name>
+        <name>P_${(i + 1).toString().padLeft(3, '0')}\n${pole.type}</name>
         <styleUrl>#poleStyle</styleUrl>
         <Point>
           <coordinates>${pole.lng},${pole.lat}</coordinates>
@@ -154,7 +155,7 @@ class SiteDetailKMZExport {
     double? customerLng,
     double? fatLat,
     double? fatLng,
-    List<({String? id, double? lat, double? lng})>? poles,
+    List<({String? id, double? lat, double? lng, String? type})>? poles,
   ) {
     int count = 0;
     if (customerLat != null && customerLng != null) count++;
@@ -231,7 +232,8 @@ class SiteDetailKMZExport {
 extension SiteDetailModelKMZX on SiteDetailModel {
   /// Generate KML from this model
   String toKML() {
-    final polesList = poles?.where((p) => p.lat != null && p.lng != null).map((p) => (id: p.id, lat: p.lat, lng: p.lng)).toList() ?? [];
+    final polesList =
+        poles?.where((p) => p.lat != null && p.lng != null).map((p) => (id: p.id, lat: p.lat, lng: p.lng, type: p.enumPoleType?.name)).toList() ?? [];
 
     return SiteDetailKMZExport.generateKML(
       circuitId: circuitId,

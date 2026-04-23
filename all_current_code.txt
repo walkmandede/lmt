@@ -1858,6 +1858,8 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
   // ── A ────────────────────────────────────────────────────────────────────
   final _circuitIdCtrl = TextEditingController();
   final _customerNameCtrl = TextEditingController();
+  final _startMeterController = TextEditingController();
+  final _endMeterController = TextEditingController();
   final _lspNameCtrl = TextEditingController();
   final _customerLatCtrl = TextEditingController();
   final _customerLngCtrl = TextEditingController();
@@ -1912,6 +1914,9 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
     if (model == null || !mounted) return;
 
     _circuitIdCtrl.text = model.circuitId;
+    _startMeterController.text = model.cableDrumStart?.toString() ?? '';
+
+    _endMeterController.text = model.cableDrumEnd?.toString() ?? '';
     _siteStatus = model.siteStatus;
     _customerNameCtrl.text = model.customerName ?? '';
     _lspNameCtrl.text = model.lspName ?? '';
@@ -1947,6 +1952,7 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
     if (g != null) {
       _existingUrls.addAll({
         'an_node': g.anNode,
+        'map_image': g.mapImage,
         'd1_1': g.d1_1,
         'd1_2': g.d1_2,
         'd2_1': g.d2_1,
@@ -2264,6 +2270,8 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
         ..opticalLevelAtbPort1310nm = double.tryParse(_optAtb1310Ctrl.text)
         ..opticalLevelAtbPort1490nm = double.tryParse(_optAtb1490Ctrl.text)
         ..dropCableLengthInMeter = _dropCableCtrl.text.trim().nullIfEmpty
+        ..cableDrumStart = double.tryParse(_startMeterController.text.trim())
+        ..cableDrumEnd = double.tryParse(_endMeterController.text.trim())
         ..rowIssue = _rowIssueCtrl.text.trim().nullIfEmpty
         ..ontSnNumber = _ontSnCtrl.text.trim().nullIfEmpty
         ..splitterNo = _splitterCtrl.text.trim().nullIfEmpty
@@ -2592,7 +2600,25 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
               Expanded(child: _labeledField(_optAtb1490Ctrl, '1490nm (dBm)', type: const TextInputType.numberWithOptions(decimal: true, signed: true))),
             ],
           ),
-          _labeledField(_dropCableCtrl, 'Drop Cable Length (m)', type: TextInputType.number),
+          Row(
+            children: [
+              Expanded(
+                child: _labeledField(_startMeterController, 'Start Meter', hint: ''),
+              ),
+              const SizedBox(
+                width: 8,
+              ),
+              Expanded(
+                child: _labeledField(_endMeterController, 'End Meter', hint: ''),
+              ),
+              const SizedBox(
+                width: 8,
+              ),
+              Expanded(
+                child: _labeledField(_dropCableCtrl, 'Drop Cable Length (m)', type: TextInputType.number),
+              ),
+            ],
+          ),
           _labeledField(_rowIssueCtrl, 'ROW Issue', hint: 'No Issue'),
         ],
       ),
@@ -2900,12 +2926,14 @@ import 'package:lmt/src/models/site_detail_model.dart';
 import 'package:lmt/src/views/_widgets/image_viewer_page.dart';
 import 'package:lmt/src/views/_widgets/section_card.dart';
 import 'package:lmt/src/views/_widgets/site_map_widget.dart';
+import 'package:lmt/src/views/sites/detail/site_detail_kmz_export.dart';
 import 'package:lmt/src/views/sites/detail/site_detail_pdf_view_page.dart';
 import 'package:lmt/src/views/sites/detail/site_map_edit_page.dart';
 import 'package:lmt/src/views/sites/export/site_pdf_page.dart';
 import 'package:lmt/src/views/sites/list/site_list_page.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:http/http.dart' as http;
+import 'package:share_plus/share_plus.dart';
 
 String _buildStaticMapUrl({
   required SiteDetailModel site,
@@ -3061,6 +3089,27 @@ class _SiteDetailPageState extends State<SiteDetailPage> {
                     _load();
                   },
                 ),
+                TextButton(
+                  onPressed: () async {
+                    await _site!.shareKMZ();
+                    // try {
+                    //   final kmzPath = await _site!.exportToKMZ();
+                    //   await SharePlus.instance.share(
+                    //     ShareParams(
+                    //       subject: '${_site?.circuitId} - Circuit Map',
+
+                    //       files: [XFile(kmzPath)],
+                    //     ),
+                    //   );
+                    // } catch (e) {
+                    //   print('Error exporting KMZ: $e');
+                    // }
+                  },
+                  child: Text(
+                    'Export KMZ',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
                 IconButton(
                   icon: const Icon(Icons.delete),
                   onPressed: _confirmDelete,
@@ -3073,7 +3122,7 @@ class _SiteDetailPageState extends State<SiteDetailPage> {
           padding: const EdgeInsets.only(bottom: 32),
           children: [
             _statusSection(site),
-            _mapSection(context, site),
+            // _mapSection(context, site),
             _sectionA(site),
             _sectionB(site),
             _sectionC(site),
@@ -3757,6 +3806,8 @@ class _SiteDetailPageState extends State<SiteDetailPage> {
           _row('1310nm', s.opticalLevelAtbPort1310nm != null ? '${s.opticalLevelAtbPort1310nm} dBm' : null),
           _row('1490nm', s.opticalLevelAtbPort1490nm != null ? '${s.opticalLevelAtbPort1490nm} dBm' : null),
           _row('Drop Cable', s.dropCableLengthInMeter != null ? '${s.dropCableLengthInMeter} m' : null),
+          _row('Start Meter', s.cableDrumStart != null ? '${s.cableDrumStart} m' : null),
+          _row('End Meter', s.cableDrumEnd != null ? '${s.cableDrumEnd} m' : null),
           _row('ROW Issue', s.rowIssue),
         ],
       ),
@@ -4062,7 +4113,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> params) async {
     return b == null ? null : pw.MemoryImage(b);
   }
 
-  String s(String key) => (params[key] as String?) ?? '-';
+  String s(String key) => (params[key]?.toString()) ?? '-';
 
   // ── Page 1: Cover ─────────────────────────────────────────────────────────
   doc.addPage(
@@ -5295,7 +5346,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> params) async {
   pw.Widget polePageHeader(pw.Context context) {
     return pw.Column(
       children: [
-        pageFooter(context.pageNumber),
+        pageHeader(mpt, ksgm),
         pw.Container(
           width: double.infinity,
           decoration: pw.BoxDecoration(
@@ -5463,8 +5514,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> params) async {
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       header: (context) => polePageHeader(context),
-
-      footer: (context) => pageHeader(mpt, ksgm),
+      footer: (context) => pageFooter(context.pageNumber),
       build: (context) {
         List rawPoles = [];
         final remainder = poles.length % 4;
@@ -6097,6 +6147,295 @@ class _SiteMapEditPageState extends State<SiteMapEditPage> {
     );
   }
 }
+import 'package:archive/archive.dart';
+import 'dart:typed_data';
+
+import 'package:lmt/src/models/site_detail_model.dart';
+import 'package:share_plus/share_plus.dart';
+
+/// Service to export SiteDetailModel to KMZ format (Flutter Web)
+class SiteDetailKMZExport {
+  /// Generate KML content from SiteDetailModel
+  static String generateKML({
+    required String circuitId,
+    String? customerName,
+    String? fatName,
+    double? customerLat,
+    double? customerLng,
+    double? fatLat,
+    double? fatLng,
+    List<({String? id, double? lat, double? lng})>? poles,
+  }) {
+    final StringBuffer kml = StringBuffer();
+
+    kml.write('''<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>$circuitId</name>
+    <open>1</open>
+    <Style id="customerStyle">
+      <IconStyle>
+        <scale>1.0</scale>
+        <Icon>
+          <href>https://zbqpdaedcztawcmwxqkh.supabase.co/storage/v1/object/public/site-images/_statics/cus_pin.png</href>
+        </Icon>
+      </IconStyle>
+    </Style>
+    <Style id="fatStyle">
+      <IconStyle>
+        <scale>1.0</scale>
+        <Icon>
+          <href>https://zbqpdaedcztawcmwxqkh.supabase.co/storage/v1/object/public/site-images/_statics/fat_pin.png</href>
+        </Icon>
+      </IconStyle>
+    </Style>
+    <Style id="poleStyle">
+      <IconStyle>
+        <scale>0.8</scale>
+        <Icon>
+          <href></href>
+        </Icon>
+      </IconStyle>
+    </Style>
+    <Style id="polylineStyle">
+      <LineStyle>
+        <color>ff0099ff</color>
+        <width>3</width>
+      </LineStyle>
+    </Style>
+    <Folder>
+      <name>Markers</name>
+''');
+
+    // Customer marker (blue)
+    if (customerLat != null && customerLng != null) {
+      kml.write('''
+      <Placemark>
+        <name>$circuitId</name>
+        <styleUrl>#customerStyle</styleUrl>
+        <Point>
+          <coordinates>$customerLng,$customerLat</coordinates>
+        </Point>
+      </Placemark>
+''');
+    }
+
+    // FAT marker (red)
+    if (fatLat != null && fatLng != null) {
+      kml.write('''
+      <Placemark>
+        <name>${fatName ?? 'N/A'}</name>
+        <styleUrl>#fatStyle</styleUrl>
+        <Point>
+          <coordinates>$fatLng,$fatLat</coordinates>
+        </Point>
+      </Placemark>
+''');
+    }
+
+    // Pole markers (green)
+    if (poles != null && poles.isNotEmpty) {
+      for (int i = 0; i < poles.length; i++) {
+        final pole = poles[i];
+        if (pole.lat != null && pole.lng != null) {
+          kml.write('''
+      <Placemark>
+        <name>Pole ${i + 1}</name>
+        <styleUrl>#poleStyle</styleUrl>
+        <Point>
+          <coordinates>${pole.lng},${pole.lat}</coordinates>
+        </Point>
+      </Placemark>
+''');
+        }
+      }
+    }
+
+    kml.write('''
+    </Folder>
+''');
+
+    // Polyline (Customer -> Poles -> FAT)
+    if (_hasPolylinePoints(customerLat, customerLng, fatLat, fatLng, poles)) {
+      kml.write('''
+    <Placemark>
+      <name>Cable Route</name>
+      <styleUrl>#polylineStyle</styleUrl>
+      <LineString>
+        <coordinates>
+''');
+
+      // Customer start
+      if (customerLat != null && customerLng != null) {
+        kml.write('          $customerLng,$customerLat\n');
+      }
+
+      // Poles in order
+      if (poles != null && poles.isNotEmpty) {
+        for (final pole in poles) {
+          if (pole.lat != null && pole.lng != null) {
+            kml.write('          ${pole.lng},${pole.lat}\n');
+          }
+        }
+      }
+
+      // FAT end
+      if (fatLat != null && fatLng != null) {
+        kml.write('          $fatLng,$fatLat\n');
+      }
+
+      kml.write('''        </coordinates>
+      </LineString>
+    </Placemark>
+''');
+    }
+
+    kml.write('''  </Document>
+</kml>
+''');
+
+    return kml.toString();
+  }
+
+  /// Check if polyline has enough points (at least 2)
+  static bool _hasPolylinePoints(
+    double? customerLat,
+    double? customerLng,
+    double? fatLat,
+    double? fatLng,
+    List<({String? id, double? lat, double? lng})>? poles,
+  ) {
+    int count = 0;
+    if (customerLat != null && customerLng != null) count++;
+    if (fatLat != null && fatLng != null) count++;
+    for (final pole in (poles ?? [])) {
+      if (pole.lat != null && pole.lng != null) count++;
+    }
+    return count > 1;
+  }
+
+  /// Create KMZ bytes (ZIP archive)
+  static Uint8List createKMZBytes(String kmlContent) {
+    final archive = Archive();
+    archive.addFile(
+      ArchiveFile(
+        'doc.kml',
+        kmlContent.length,
+        kmlContent.codeUnits,
+      ),
+    );
+
+    final kmzBytes = ZipEncoder().encode(archive);
+    // if (kmzBytes == null) {
+    //   throw Exception('Failed to encode KMZ file');
+    // }
+
+    return Uint8List.fromList(kmzBytes);
+  }
+
+  /// Download KMZ file to user's device
+  static void downloadKMZ({
+    required String circuitId,
+    required Uint8List kmzBytes,
+  }) {
+    // final blob = html.Blob([kmzBytes], 'application/vnd.google-earth.kmz');
+    // final url = html.Url.createObjectUrl(blob);
+    // final anchor = html.AnchorElement(href: url)
+    //   ..setAttribute('download', '$circuitId.kmz')
+    //   ..click();
+    // html.Url.revokeObjectUrl(url);
+  }
+
+  /// Download KML file (uncompressed)
+  static void downloadKML({
+    required String circuitId,
+    required String kmlContent,
+  }) {
+    // final blob = html.Blob([kmlContent], 'application/vnd.google-earth.kml+xml');
+    // final url = html.Url.createObjectUrl(blob);
+    // final anchor = html.AnchorElement(href: url)
+    //   ..setAttribute('download', '$circuitId.kml')
+    //   ..click();
+    // html.Url.revokeObjectUrl(url);
+  }
+
+  /// Get KMZ as data URL (for preview or sharing)
+  static String getKMZDataUrl(Uint8List kmzBytes) {
+    final base64 = _bytesToBase64(kmzBytes);
+    return 'data:application/vnd.google-earth.kmz;base64,$base64';
+  }
+
+  /// Convert bytes to base64 string
+  static String _bytesToBase64(Uint8List bytes) {
+    final chars = <String>[];
+    for (int i = 0; i < bytes.length; i++) {
+      chars.add(String.fromCharCode(bytes[i]));
+    }
+    return chars.join();
+  }
+}
+
+// ── Extension on SiteDetailModel ──────────────────────────────────────────
+
+extension SiteDetailModelKMZX on SiteDetailModel {
+  /// Generate KML from this model
+  String toKML() {
+    final polesList = poles?.where((p) => p.lat != null && p.lng != null).map((p) => (id: p.id, lat: p.lat, lng: p.lng)).toList() ?? [];
+
+    return SiteDetailKMZExport.generateKML(
+      circuitId: circuitId,
+      customerName: customerName,
+      fatName: fatName,
+      customerLat: customerLat,
+      customerLng: customerLng,
+      fatLat: fatLat,
+      fatLng: fatLng,
+      poles: polesList,
+    );
+  }
+
+  /// Create KMZ bytes
+  Uint8List toKMZBytes() {
+    final kmlContent = toKML();
+    return SiteDetailKMZExport.createKMZBytes(kmlContent);
+  }
+
+  /// Download KMZ file
+  void downloadKMZ() {
+    final kmlContent = toKML();
+    final kmzBytes = SiteDetailKMZExport.createKMZBytes(kmlContent);
+    SiteDetailKMZExport.downloadKMZ(
+      circuitId: circuitId,
+      kmzBytes: kmzBytes,
+    );
+  }
+
+  Future<void> shareKMZ() async {
+    final kmlContent = toKML();
+    final kmzBytes = SiteDetailKMZExport.createKMZBytes(kmlContent);
+    await SharePlus.instance.share(
+      ShareParams(
+        text: 'Share for site',
+        files: [XFile.fromData(kmzBytes, name: '$circuitId.kmz')],
+      ),
+    );
+  }
+
+  /// Download KML file (uncompressed)
+  void downloadKML() {
+    final kmlContent = toKML();
+    SiteDetailKMZExport.downloadKML(
+      circuitId: circuitId,
+      kmlContent: kmlContent,
+    );
+  }
+
+  /// Get KMZ as data URL
+  String getKMZDataUrl() {
+    final kmzBytes = toKMZBytes();
+    return SiteDetailKMZExport.getKMZDataUrl(kmzBytes);
+  }
+}
 import 'package:flutter/services.dart';
 import 'package:lmt/src/views/sites/detail/site_detail_pdf_view_page.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -6599,7 +6938,7 @@ class _SiteListPageState extends State<SiteListPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('FTTH Sites - v(1.0.6)'),
+        title: const Text('FTTH Sites - v(1.0.7)'),
         actions: [
           // Sort / filter button with active badge
           Stack(

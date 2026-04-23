@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -28,6 +29,9 @@ Future<Uint8List?> readClipboardImage() async {
 
 void superPrint(var content, {var title = 'Super Print'}) {
   String callerFrame = '';
+
+  log(content.toString(), name: title);
+  return;
 
   if (kDebugMode) {
     try {

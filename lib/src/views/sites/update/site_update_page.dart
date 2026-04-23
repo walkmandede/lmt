@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:lmt/core/constants/app_functions.dart';
 import 'package:lmt/core/repositories/site_repository.dart';
 import 'package:lmt/core/services/site_service.dart';
@@ -19,6 +22,9 @@ class SiteUpdatePage extends StatefulWidget {
 }
 
 class _SiteUpdatePageState extends State<SiteUpdatePage> {
+  SiteDetailModel? _siteDetailModel;
+  MapController _flutterMapController = MapController();
+
   final _picker = ImagePicker();
   final _storage = StorageService();
   final _service = SupabaseSiteService();
@@ -83,8 +89,9 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
 
   Future<void> _load() async {
     final model = await _service.getSite(widget.circuitId);
-    if (model == null || !mounted) return;
 
+    if (model == null || !mounted) return;
+    _siteDetailModel = model;
     _circuitIdCtrl.text = model.circuitId;
     _startMeterController.text = model.cableDrumStart?.toString() ?? '';
 
@@ -799,12 +806,109 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
 
   // ── C: Poles ──────────────────────────────────────────────────────────────
 
+  Widget _mapPreview() {
+    final size = MediaQuery.of(context).size;
+    final minSize = min(size.height, size.width);
+    superPrint('map rebuilt');
+    return SizedBox(
+      width: minSize * 0.55,
+      height: minSize * 0.35,
+      child: DecoratedBox(
+        decoration: BoxDecoration(border: Border.all()),
+        child: FlutterMap(
+          mapController: _flutterMapController,
+          options: MapOptions(
+            initialCenter:
+                _siteDetailModel?.customerLatLng ?? _siteDetailModel?.fatLatLng ?? _siteDetailModel?.poles?.firstOrNull?.location ?? LatLng(16.1216, 96.125),
+            initialZoom: 14,
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'LMT',
+            ),
+            MarkerLayer(
+              markers: [
+                //cus
+                if (_siteDetailModel?.customerLatLng != null)
+                  Marker(
+                    point: _siteDetailModel!.customerLatLng!,
+                    child: Center(
+                      child: Icon(
+                        Icons.home,
+                        color: Colors.green,
+                      ),
+                    ),
+                  ),
+                if (_siteDetailModel?.fatLatLng != null)
+                  Marker(
+                    point: _siteDetailModel!.fatLatLng!,
+                    child: Center(
+                      child: Icon(
+                        Icons.router,
+                        color: Colors.green,
+                      ),
+                    ),
+                  ),
+                ...(_poles).where((p) => p.hasLocation).map((p) {
+                  final index = _poles.indexOf(p);
+                  return Marker(
+                    point: p.location!,
+                    child: Card(
+                      color: Colors.black.withAlpha(155),
+                      child: FittedBox(
+                        child: Text(
+                          'P_${(index + 1).toString().padLeft(3, '0')}',
+                          style: TextStyle(fontSize: 10, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+            //line
+            PolylineLayer(
+              polylines: [
+                Polyline(
+                  color: Colors.blue,
+                  strokeWidth: 2,
+                  points: [
+                    if (_siteDetailModel?.customerLatLng != null) _siteDetailModel!.customerLatLng!,
+                    if (_siteDetailModel?.fatLatLng != null) _siteDetailModel!.fatLatLng!,
+                    ...(_poles).where((p) => p.hasLocation).map((p) {
+                      return p.location!;
+                    }),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _sectionC() {
     return SectionCard(
       title: 'C  Cable Route / Poles',
       child: Column(
         children: [
-          ..._poles.asMap().entries.map((e) => _poleRow(e.key, e.value)),
+          _mapPreview(),
+          ReorderableListView(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            onReorder: (oldIndex, newIndex) {
+              setState(() {
+                if (newIndex > oldIndex) newIndex--;
+                final item = _poles.removeAt(oldIndex);
+                _poles.insert(newIndex, item);
+              });
+            },
+            children: [
+              for (int i = 0; i < _poles.length; i++) _poleRow(i, _poles[i], key: _poles[i]._key),
+            ],
+          ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
             onPressed: () => setState(() => _poles.add(_PoleEntry())),
@@ -816,80 +920,153 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
     );
   }
 
-  Widget _poleRow(int index, _PoleEntry entry) {
+  Widget _poleRow(int index, _PoleEntry entry, {required Key key}) {
     final poleLabel = 'P_${(index + 1).toString().padLeft(3, '0')}';
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(8),
+    return ExpansionTile(
+      backgroundColor: Colors.grey.withAlpha((0.15 * 255).toInt()),
+      key: key,
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: Colors.black),
+        borderRadius: BorderRadiusGeometry.circular(10),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      title: Row(
         children: [
-          Row(
-            children: [
-              Text(poleLabel, style: const TextStyle(fontWeight: FontWeight.bold)),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.delete, size: 18, color: Colors.red),
-                onPressed: () => setState(() => _poles.removeAt(index)),
-              ),
-            ],
-          ),
-          DropdownButtonFormField<EnumPoleType>(
-            initialValue: entry.type,
-            decoration: const InputDecoration(
-              labelText: 'Pole Type',
-              isDense: true,
-              border: OutlineInputBorder(),
+          // Drag handle
+          ReorderableDragStartListener(
+            index: index,
+            child: const Padding(
+              padding: EdgeInsets.only(right: 8),
+              child: Icon(Icons.drag_handle, color: Colors.grey, size: 22),
             ),
-            items: EnumPoleType.values.map((t) => DropdownMenuItem(value: t, child: Text(t.name.toUpperCase()))).toList(),
-            onChanged: (v) => setState(() => entry.type = v),
           ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: entry.latCtrl,
-                  decoration: const InputDecoration(labelText: 'Latitude', isDense: true, border: OutlineInputBorder()),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: entry.lngCtrl,
-                  decoration: const InputDecoration(labelText: 'Longitude', isDense: true, border: OutlineInputBorder()),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Pole Photo',
-            style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500),
-          ),
-          const SizedBox(height: 4),
-          _photoSlot(
-            context: context,
-            newFile: entry.newImage,
-            existingUrl: entry.existingImageUrl,
-            label: 'Tap to add $poleLabel photo',
-            onTap: () => _pickPoleImage(index),
-            onRemove: () => setState(() {
-              _poles[index].newImage = null;
-              _poles[index].existingImageUrl = null;
-            }),
+          Text('$poleLabel - ${entry.type?.name}', style: const TextStyle(fontWeight: FontWeight.bold)),
+          const Spacer(),
+          IconButton(
+            icon: const Icon(Icons.delete, size: 18, color: Colors.red),
+            onPressed: () => setState(() => _poles.removeAt(index)),
           ),
         ],
       ),
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              DropdownButtonFormField<EnumPoleType>(
+                initialValue: entry.type,
+                decoration: const InputDecoration(
+                  labelText: 'Pole Type',
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                ),
+                items: EnumPoleType.values.map((t) => DropdownMenuItem(value: t, child: Text(t.name.toUpperCase()))).toList(),
+                onChanged: (v) => setState(() => entry.type = v),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: entry.latCtrl,
+                      decoration: const InputDecoration(labelText: 'Latitude', isDense: true, border: OutlineInputBorder()),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: entry.lngCtrl,
+                      decoration: const InputDecoration(labelText: 'Longitude', isDense: true, border: OutlineInputBorder()),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Pole Photo',
+                style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 4),
+              _photoSlot(
+                context: context,
+                newFile: entry.newImage,
+                existingUrl: entry.existingImageUrl,
+                label: 'Tap to add $poleLabel photo',
+                onTap: () => _pickPoleImage(index),
+                onRemove: () => setState(() {
+                  _poles[index].newImage = null;
+                  _poles[index].existingImageUrl = null;
+                }),
+              ),
+            ],
+          ),
+        ),
+      ],
+      // child: Container(
+      //   key: key,
+      //   margin: const EdgeInsets.only(bottom: 12),
+      //   padding: const EdgeInsets.all(10),
+      //   decoration: BoxDecoration(
+      //     border: Border.all(color: Colors.grey.shade300),
+      //     borderRadius: BorderRadius.circular(8),
+      //   ),
+      //   child: Column(
+      //     crossAxisAlignment: CrossAxisAlignment.start,
+      //     children: [
+      //       DropdownButtonFormField<EnumPoleType>(
+      //         initialValue: entry.type,
+      //         decoration: const InputDecoration(
+      //           labelText: 'Pole Type',
+      //           isDense: true,
+      //           border: OutlineInputBorder(),
+      //         ),
+      //         items: EnumPoleType.values.map((t) => DropdownMenuItem(value: t, child: Text(t.name.toUpperCase()))).toList(),
+      //         onChanged: (v) => setState(() => entry.type = v),
+      //       ),
+      //       const SizedBox(height: 8),
+      //       Row(
+      //         children: [
+      //           Expanded(
+      //             child: TextField(
+      //               controller: entry.latCtrl,
+      //               decoration: const InputDecoration(labelText: 'Latitude', isDense: true, border: OutlineInputBorder()),
+      //               keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+      //             ),
+      //           ),
+      //           const SizedBox(width: 8),
+      //           Expanded(
+      //             child: TextField(
+      //               controller: entry.lngCtrl,
+      //               decoration: const InputDecoration(labelText: 'Longitude', isDense: true, border: OutlineInputBorder()),
+      //               keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+      //             ),
+      //           ),
+      //         ],
+      //       ),
+      //       const SizedBox(height: 8),
+      //       const Text(
+      //         'Pole Photo',
+      //         style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500),
+      //       ),
+      //       const SizedBox(height: 4),
+      //       _photoSlot(
+      //         context: context,
+      //         newFile: entry.newImage,
+      //         existingUrl: entry.existingImageUrl,
+      //         label: 'Tap to add $poleLabel photo',
+      //         onTap: () => _pickPoleImage(index),
+      //         onRemove: () => setState(() {
+      //           _poles[index].newImage = null;
+      //           _poles[index].existingImageUrl = null;
+      //         }),
+      //       ),
+      //     ],
+      //   ),
+      // ),
     );
   }
-
   // ── D ─────────────────────────────────────────────────────────────────────
 
   Widget _sectionD() {
@@ -1043,6 +1220,7 @@ class _SiteUpdatePageState extends State<SiteUpdatePage> {
 // ── Pole entry ────────────────────────────────────────────────────────────────
 
 class _PoleEntry {
+  final _key = UniqueKey();
   String? existingId;
   EnumPoleType? type;
   final latCtrl = TextEditingController();
@@ -1059,6 +1237,20 @@ class _PoleEntry {
       ..latCtrl.text = p.lat?.toString() ?? ''
       ..lngCtrl.text = p.lng?.toString() ?? ''
       ..existingImageUrl = p.image;
+  }
+
+  bool get hasLocation {
+    return location != null;
+  }
+
+  LatLng? get location {
+    final lat = double.tryParse(latCtrl.text.trim());
+    final lng = double.tryParse(lngCtrl.text.trim());
+    if (lat != null && lng != null) {
+      return LatLng(lat, lng);
+    } else {
+      return null;
+    }
   }
 }
 

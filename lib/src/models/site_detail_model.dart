@@ -82,6 +82,8 @@ class SitePoleModel {
 
   bool get hasLocations => lat != null && lng != null;
 
+  LatLng? get location => hasLocations ? LatLng(lat!, lng!) : null;
+
   Map<String, dynamic> toJson() => {
     if (id != null) 'id': id,
     'circuit_id': circuitId,

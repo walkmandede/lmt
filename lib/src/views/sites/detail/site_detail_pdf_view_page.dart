@@ -17,7 +17,7 @@ PdfColor pdfColorBlue1 = PdfColor.fromHex('#90abdd');
 PdfColor pdfColorBlue2 = PdfColor.fromHex('#dae3f3');
 PdfColor pdfColorGrey1 = PdfColor.fromHex('#d9d9d9');
 
-Future<Uint8List> _buildPdf(Map<String, dynamic> params) async {
+Future<Uint8List> _buildPdf(Map<String, dynamic> params, Uint8List? mapTableImage) async {
   final doc = pw.Document(title: 'Site Detail Report', author: 'Galaxia Net');
 
   final mpt = params['imgMpt'] as Uint8List;
@@ -148,8 +148,30 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> params) async {
             pw.SizedBox(height: 16),
             band('C', 'Cable Route Diagram'),
             pw.Expanded(
-              child: img('map_image') == null ? pw.SizedBox.expand() : pw.Image(img('map_image')!),
+              child: img('map_image') == null
+                  ? pw.SizedBox.expand()
+                  : pw.Column(
+                      children: [
+                        pw.Expanded(
+                          flex: 5,
+                          child: pw.Image(
+                            img('map_image')!,
+                            fit: pw.BoxFit.cover,
+                          ),
+                        ),
+                        pw.Expanded(
+                          flex: 2,
+                          child: mapTableImage == null
+                              ? pw.SizedBox.shrink()
+                              : pw.Image(
+                                  pw.MemoryImage(mapTableImage!),
+                                  fit: pw.BoxFit.fill,
+                                ),
+                        ),
+                      ],
+                    ),
             ),
+
             // if (mapImgBytes != null)
             // pw.Expanded(
             //   child: pw.Center(child: pw.Image(pw.MemoryImage(mapImgBytes), width: double.infinity)),
@@ -1270,7 +1292,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> params) async {
   pw.Widget polePageHeader(pw.Context context) {
     return pw.Column(
       children: [
-        pageFooter(context.pageNumber),
+        pageHeader(mpt, ksgm),
         pw.Container(
           width: double.infinity,
           decoration: pw.BoxDecoration(
@@ -1438,7 +1460,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> params) async {
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       header: (context) => polePageHeader(context),
-      footer: (context) => pageHeader(mpt, ksgm),
+      footer: (context) => pageFooter(context.pageNumber),
       build: (context) {
         List rawPoles = [];
         final remainder = poles.length % 4;
@@ -1634,6 +1656,7 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> params) async {
       },
     ),
   );
+
   superPrint('pdf has been saved');
   return await doc.save();
 }
@@ -1644,12 +1667,12 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> params) async {
 
 class SiteDetailPdfViewPage extends StatefulWidget {
   final SiteDetailModel siteDetailModel;
-  final Uint8List? mapImage;
+  final Uint8List? mapTableImage;
 
   const SiteDetailPdfViewPage({
     super.key,
     required this.siteDetailModel,
-    required this.mapImage,
+    required this.mapTableImage,
   });
 
   @override
@@ -1748,7 +1771,7 @@ class _SiteDetailPdfViewPageState extends State<SiteDetailPdfViewPage> {
     final params = <String, dynamic>{
       'imgMpt': imgMptData.buffer.asUint8List(),
       'imgKsgm': imgKsgmData.buffer.asUint8List(),
-      'mapImage': widget.mapImage,
+      'mapImage': widget.mapTableImage,
       // Text fields
       'circuitId': _sd.circuitId,
       'cableDrumStart': _sd.cableDrumStart,
@@ -1785,7 +1808,7 @@ class _SiteDetailPdfViewPageState extends State<SiteDetailPdfViewPage> {
     await Future.delayed(const Duration(milliseconds: 500));
 
     // final pdfBytes = await compute(_buildPdf, params);
-    final pdfBytes = await _buildPdf(params);
+    final pdfBytes = await _buildPdf(params, widget.mapTableImage);
 
     await Future.delayed(const Duration(milliseconds: 250));
 
