@@ -13,7 +13,7 @@ git checkout github-page
 - delete all content
 - paste content from recently copied web folder
 
-git add .; git commit -m "deploy 1.0.7prod"; git push origin github-page --force; git checkout main;
+git add .; git commit -m "deploy 1.0.9prod"; git push origin github-page --force; git checkout main;
 
 
 # extract all codes

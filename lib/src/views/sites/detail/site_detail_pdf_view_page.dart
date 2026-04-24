@@ -141,12 +141,12 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> params, Uint8List? mapTableImag
             dataRow('4', 'Activation/Relocated Date', DateTime.tryParse(s('activationDateTime'))?.toString().substring(0, 10) ?? '-'),
             pw.SizedBox(height: 16),
             band('B', 'Site/FAT information'),
-            dataRow('1', 'Survey Result (Feasible)', s('surveyResultDateTime')),
+            dataRow('1', 'Survey Result (Feasible)', DateTime.tryParse(s('surveyResultDateTime').toString())?.toString().substring(0, 10) ?? '-'),
             dataRow('2', 'FAT Name', s('fatName')),
             dataRow('3', 'FAT Port No', s('fatPortNumber')),
             dataRow2('4', 'FAT Location (Coordinates)', 'Lat', s('fatLat').formatDecimal(), 'Long', s('fatLng').formatDecimal()),
-            dataRow2('5', 'Optical Level at FAT port', '1310nm', '${s('opticalLevelFatPort1310nm')} dBM', '1490nm', '${s('opticalLevelFatPort1490nm')} dBm'),
-            dataRow2('6', 'Optical Level at ATB port', '1310nm', '${s('opticalLevelAtbPort1310nm')} dBM', '1490nm', '${s('opticalLevelAtbPort1490nm')} dBM'),
+            dataRow2('5', 'Optical Level at FAT port', '1310nm', '${s('opticalLevelFatPort1310nm')} dBm', '1490nm', '${s('opticalLevelFatPort1490nm')} dBm'),
+            dataRow2('6', 'Optical Level at ATB port', '1310nm', '${s('opticalLevelAtbPort1310nm')} dBm', '1490nm', '${s('opticalLevelAtbPort1490nm')} dBm'),
             dataRow('7', 'Drop Cable Length (m)', s('dropCableLengthInMeter')),
             dataRow('8', 'ROW issue', s('rowIssue')),
             pw.SizedBox(height: 16),
@@ -890,7 +890,9 @@ Future<Uint8List> _buildPdf(Map<String, dynamic> params, Uint8List? mapTableImag
                         child: pw.Column(
                           crossAxisAlignment: pw.CrossAxisAlignment.start,
                           children: [
-                            txt('Other Remark: ${s('cableDrumStart')} - ${s('cableDrumEnd')} = ${s('dropCableLengthInMeter')}m'),
+                            txt(
+                              'Other Remark: ${double.tryParse(s('cableDrumStart'))?.ceil() ?? '(No start meter)'} m - ${double.tryParse(s('cableDrumEnd'))?.ceil() ?? '(No end meter)'} m = ${s('dropCableLengthInMeter')}m',
+                            ),
                             pw.Expanded(
                               child: pw.Row(
                                 children: [
