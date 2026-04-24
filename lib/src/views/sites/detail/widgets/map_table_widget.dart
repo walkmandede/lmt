@@ -63,35 +63,35 @@ class MapTableWidget extends StatelessWidget {
                               _cell(
                                 Text(
                                   'No',
-                                  style: TextStyle(color: Colors.black, fontSize: baseFontSize),
+                                  style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: baseFontSize),
                                 ),
                                 height: 45,
                               ),
                               _cell(
                                 Text(
                                   'Outline',
-                                  style: TextStyle(color: Colors.black, fontSize: baseFontSize),
+                                  style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: baseFontSize),
                                 ),
                                 height: 45,
                               ),
                               _cell(
                                 Text(
                                   'Description',
-                                  style: TextStyle(color: Colors.black, fontSize: baseFontSize),
+                                  style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: baseFontSize),
                                 ),
                                 height: 45,
                               ),
                               _cell(
                                 Text(
                                   'Unit',
-                                  style: TextStyle(color: Colors.black, fontSize: baseFontSize),
+                                  style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: baseFontSize),
                                 ),
                                 height: 45,
                               ),
                               _cell(
                                 Text(
                                   'Qty',
-                                  style: TextStyle(color: Colors.black, fontSize: baseFontSize),
+                                  style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: baseFontSize),
                                 ),
                                 height: 45,
                               ),
@@ -103,7 +103,10 @@ class MapTableWidget extends StatelessWidget {
                             _cell(
                               Text(
                                 '1',
-                                style: TextStyle(fontSize: baseFontSize),
+                                style: TextStyle(
+                                  fontSize: baseFontSize,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                             _cell(Container(height: 2, width: 20, color: Colors.blue)),
@@ -113,20 +116,29 @@ class MapTableWidget extends StatelessWidget {
                                 child: Text(
                                   'Drop Cable Length',
                                   textAlign: TextAlign.center,
-                                  style: TextStyle(fontSize: baseFontSize),
+                                  style: TextStyle(
+                                    fontSize: baseFontSize,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ),
                             _cell(
                               Text(
                                 'Meter',
-                                style: TextStyle(fontSize: baseFontSize),
+                                style: TextStyle(
+                                  fontSize: baseFontSize,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                             _cell(
                               Text(
                                 site.dropCableLengthInMeter ?? '-',
-                                style: TextStyle(fontSize: baseFontSize),
+                                style: TextStyle(
+                                  fontSize: baseFontSize,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ]),
@@ -136,7 +148,10 @@ class MapTableWidget extends StatelessWidget {
                             _cell(
                               Text(
                                 '2',
-                                style: TextStyle(fontSize: baseFontSize),
+                                style: TextStyle(
+                                  fontSize: baseFontSize,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                             _cell(
@@ -161,19 +176,28 @@ class MapTableWidget extends StatelessWidget {
                               Text(
                                 'Other Pole',
                                 textAlign: TextAlign.center,
-                                style: TextStyle(fontSize: baseFontSize),
+                                style: TextStyle(
+                                  fontSize: baseFontSize,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                             _cell(
                               Text(
                                 'Pcs',
-                                style: TextStyle(fontSize: baseFontSize),
+                                style: TextStyle(
+                                  fontSize: baseFontSize,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                             _cell(
                               Text(
                                 poles.where((p) => p.enumPoleType == EnumPoleType.other).length.toString(),
-                                style: TextStyle(fontSize: baseFontSize),
+                                style: TextStyle(
+                                  fontSize: baseFontSize,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ]),
@@ -183,7 +207,10 @@ class MapTableWidget extends StatelessWidget {
                             _cell(
                               Text(
                                 '3',
-                                style: TextStyle(fontSize: baseFontSize),
+                                style: TextStyle(
+                                  fontSize: baseFontSize,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                             _cell(
@@ -208,19 +235,28 @@ class MapTableWidget extends StatelessWidget {
                               Text(
                                 'EPC Pole',
                                 textAlign: TextAlign.center,
-                                style: TextStyle(fontSize: baseFontSize),
+                                style: TextStyle(
+                                  fontSize: baseFontSize,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                             _cell(
                               Text(
                                 'Pcs',
-                                style: TextStyle(fontSize: baseFontSize),
+                                style: TextStyle(
+                                  fontSize: baseFontSize,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                             _cell(
                               Text(
                                 poles.where((p) => p.enumPoleType == EnumPoleType.epc).length.toString(),
-                                style: TextStyle(fontSize: baseFontSize),
+                                style: TextStyle(
+                                  fontSize: baseFontSize,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ]),
@@ -230,7 +266,10 @@ class MapTableWidget extends StatelessWidget {
                             _cell(
                               Text(
                                 '4',
-                                style: TextStyle(fontSize: baseFontSize),
+                                style: TextStyle(
+                                  fontSize: baseFontSize,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                             _cell(
@@ -255,19 +294,28 @@ class MapTableWidget extends StatelessWidget {
                               Text(
                                 'MPT Pole',
                                 textAlign: TextAlign.center,
-                                style: TextStyle(fontSize: baseFontSize),
+                                style: TextStyle(
+                                  fontSize: baseFontSize,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                             _cell(
                               Text(
                                 'Pcs',
-                                style: TextStyle(fontSize: baseFontSize),
+                                style: TextStyle(
+                                  fontSize: baseFontSize,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                             _cell(
                               Text(
                                 poles.where((p) => p.enumPoleType == EnumPoleType.mpt).length.toString(),
-                                style: TextStyle(fontSize: baseFontSize),
+                                style: TextStyle(
+                                  fontSize: baseFontSize,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ]),
@@ -286,7 +334,10 @@ class MapTableWidget extends StatelessWidget {
                         decoration: BoxDecoration(border: Border.all()),
                         child: Text(
                           'LSP Name: ${site.lspName ?? '-'}',
-                          style: TextStyle(fontSize: baseFontSize),
+                          style: TextStyle(
+                            fontSize: baseFontSize,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),

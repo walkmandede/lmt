@@ -111,19 +111,7 @@ class _SiteMapEditPageState extends State<SiteMapEditPage> {
 
   // ── Total cable length label ───────────────────────────────────────────────
   String _cableLengthLabel() {
-    final poles = _sd.poles ?? [];
-    final List<LatLng> pts = [
-      if (_sd.customerLatLng != null) _sd.customerLatLng!,
-      ...poles.where((p) => p.hasLocations).map((p) => LatLng(p.lat!, p.lng!)),
-      if (_sd.fatLatLng != null) _sd.fatLatLng!,
-    ];
-
-    double total = 0;
-    for (int i = 1; i < pts.length; i++) {
-      total += _distanceMetres(pts[i - 1], pts[i]);
-    }
-
-    return total >= 1000 ? '${(total / 1000).toStringAsFixed(2)} km' : '${total.toStringAsFixed(0)} m';
+    return '${_sd.dropCableLengthInMeter ?? '-'} m';
   }
 
   // ─────────────────────────────────────────────
@@ -187,6 +175,8 @@ class _SiteMapEditPageState extends State<SiteMapEditPage> {
       ...poles.where((p) => p.hasLocations).map((p) => LatLng(p.lat!, p.lng!)),
     ];
 
+    final markerSize = 22.0;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_sd.circuitId),
@@ -233,7 +223,7 @@ class _SiteMapEditPageState extends State<SiteMapEditPage> {
               if (_sd.customerLatLng != null)
                 DragMarker(
                   point: _sd.customerLatLng!,
-                  size: const Size(30, 30),
+                  size: Size(markerSize, markerSize),
                   alignment: Alignment.topCenter,
                   builder: (_, __, ___) => Card(
                     margin: EdgeInsets.zero,
@@ -254,12 +244,19 @@ class _SiteMapEditPageState extends State<SiteMapEditPage> {
               if (_sd.fatLatLng != null)
                 DragMarker(
                   point: _sd.fatLatLng!,
-                  size: const Size(30, 30),
-                  alignment: Alignment.topCenter,
-                  builder: (_, __, ___) => const Icon(
-                    Icons.location_on_rounded,
+                  size: Size(markerSize, markerSize),
+                  alignment: Alignment.center,
+                  builder: (_, __, ___) => Card(
+                    elevation: 0,
+                    shape: const CircleBorder(),
                     color: Colors.green,
-                    size: 30,
+                    child: Center(
+                      child: Container(
+                        height: 3,
+                        width: 35,
+                        color: Colors.black,
+                      ),
+                    ),
                   ),
                   onDragEnd: (details, point) {
                     setState(() {
@@ -270,52 +267,47 @@ class _SiteMapEditPageState extends State<SiteMapEditPage> {
                 ),
 
               // ── Pole markers ─────────────────────────────────────────────
-              ...poles
-                  .asMap()
-                  .entries
-                  .map((entry) {
-                    final index = entry.key;
-                    final pole = entry.value;
-                    if (!pole.hasLocations) return null;
+              ...poles.asMap().entries.map((entry) {
+                final index = entry.key;
+                final pole = entry.value;
+                if (!pole.hasLocations) return null;
 
-                    Color color = Colors.black;
-                    if (pole.enumPoleType != null) {
-                      switch (pole.enumPoleType) {
-                        case null:
-                          color = Colors.black;
-                        case EnumPoleType.epc:
-                          color = Colors.red;
-                        case EnumPoleType.mpt:
-                          color = Colors.green;
-                        case EnumPoleType.other:
-                          color = Colors.blue;
-                      }
-                    }
-                    return DragMarker(
-                      point: LatLng(pole.lat!, pole.lng!),
-                      size: const Size(30, 30),
-                      builder: (_, __, ___) => Card(
-                        elevation: 0,
-                        shape: const CircleBorder(),
-                        color: color,
-                        child: Center(
-                          child: Container(
-                            height: 3,
-                            width: 35,
-                            color: Colors.black,
-                          ),
-                        ),
+                Color color = Colors.black;
+                if (pole.enumPoleType != null) {
+                  switch (pole.enumPoleType) {
+                    case null:
+                      color = Colors.black;
+                    case EnumPoleType.epc:
+                      color = Colors.red;
+                    case EnumPoleType.mpt:
+                      color = Colors.green;
+                    case EnumPoleType.other:
+                      color = Colors.blue;
+                  }
+                }
+                return DragMarker(
+                  point: LatLng(pole.lat!, pole.lng!),
+                  size: Size(markerSize, markerSize),
+                  builder: (_, __, ___) => Card(
+                    elevation: 0,
+                    shape: const CircleBorder(),
+                    color: color,
+                    child: Center(
+                      child: Container(
+                        height: 3,
+                        width: 35,
+                        color: Colors.black,
                       ),
-                      onDragEnd: (details, point) {
-                        setState(() {
-                          _sd.poles![index].lat = point.latitude;
-                          _sd.poles![index].lng = point.longitude;
-                        });
-                      },
-                    );
-                  })
-                  .whereType<DragMarker>()
-                  .toList(),
+                    ),
+                  ),
+                  onDragEnd: (details, point) {
+                    setState(() {
+                      _sd.poles![index].lat = point.latitude;
+                      _sd.poles![index].lng = point.longitude;
+                    });
+                  },
+                );
+              }).whereType<DragMarker>(),
 
               // ── Customer info box marker ─────────────────────────────────
               // Shown only when customer location is available.
