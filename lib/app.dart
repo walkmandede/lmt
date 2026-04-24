@@ -4,7 +4,15 @@ import 'package:lmt/src/views/sites/create/site_create_page.dart';
 import 'package:lmt/src/views/sites/detail/site_detail_page.dart';
 import 'package:lmt/src/views/sites/import/site_import_page.dart';
 import 'package:lmt/src/views/sites/list/site_list_page.dart';
+import 'package:lmt/src/views/sites/override_import/override_import_page.dart';
 import 'package:lmt/src/views/sites/update/site_update_page.dart';
+
+class AppRoutes {
+  static const root = '/';
+  static const create = '/create';
+  static const mapPage = '/map_page';
+  static const overrideImportPage = '/override_import_page';
+}
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -40,6 +48,9 @@ class MyApp extends StatelessWidget {
 
         if (settings.name == '/import') {
           return MaterialPageRoute(builder: (_) => SiteImportPage());
+        }
+        if (settings.name == AppRoutes.overrideImportPage) {
+          return MaterialPageRoute(builder: (_) => OverrideImportPage());
         }
         // '/import': (_) => const SiteImportPage(),
 

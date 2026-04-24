@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:lmt/app.dart';
 import 'package:lmt/core/services/site_service.dart';
 import 'package:lmt/src/models/site_detail_model.dart';
 
@@ -382,11 +383,12 @@ class _SiteListPageState extends State<SiteListPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('FTTH Sites - v(1.1.2)'),
+        title: const Text('FTTH Sites - v(1.1.3)'),
         actions: [
           // Sort / filter button with active badge
           Stack(
             clipBehavior: Clip.none,
+            alignment: Alignment.center,
             children: [
               IconButton(
                 icon: const Icon(Icons.tune),
@@ -401,7 +403,7 @@ class _SiteListPageState extends State<SiteListPage> {
                     width: 8,
                     height: 8,
                     decoration: const BoxDecoration(
-                      color: Colors.orange,
+                      color: Colors.red,
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -413,7 +415,20 @@ class _SiteListPageState extends State<SiteListPage> {
               await Navigator.pushNamed(context, '/import');
               _refresh();
             },
-            child: const Text('Import Excel', style: TextStyle(color: Colors.yellow)),
+            child: const Text(
+              'Import Excel',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              await Navigator.pushNamed(context, AppRoutes.overrideImportPage);
+              _refresh();
+            },
+            child: const Text(
+              'Import Overrides',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
         bottom: PreferredSize(
