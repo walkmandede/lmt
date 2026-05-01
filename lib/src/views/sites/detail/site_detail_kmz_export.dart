@@ -70,37 +70,35 @@ class SiteDetailKMZExport {
     </Style>
     <Style id="polylineStyle">
       <LineStyle>
-        <color>ff0000ff</color>
+        <color>ffff0000</color>
         <width>3</width>
       </LineStyle>
     </Style>
-    <Folder>
-      <name>Markers</name>
 ''');
 
     // Customer marker (blue)
     if (customerLat != null && customerLng != null) {
       kml.write('''
-      <Placemark>
-        <name>$circuitId</name>
-        <styleUrl>#customerStyle</styleUrl>
-        <Point>
-          <coordinates>$customerLng,$customerLat</coordinates>
-        </Point>
-      </Placemark>
+    <Placemark>
+      <name>$circuitId</name>
+      <styleUrl>#customerStyle</styleUrl>
+      <Point>
+        <coordinates>$customerLng,$customerLat</coordinates>
+      </Point>
+    </Placemark>
 ''');
     }
 
     // FAT marker (red)
     if (fatLat != null && fatLng != null) {
       kml.write('''
-      <Placemark>
-        <name>${fatName ?? 'N/A'}</name>
-        <styleUrl>#fatStyle</styleUrl>
-        <Point>
-          <coordinates>$fatLng,$fatLat</coordinates>
-        </Point>
-      </Placemark>
+    <Placemark>
+      <name>${fatName ?? 'N/A'}</name>
+      <styleUrl>#fatStyle</styleUrl>
+      <Point>
+        <coordinates>$fatLng,$fatLat</coordinates>
+      </Point>
+    </Placemark>
 ''');
     }
 
@@ -124,24 +122,20 @@ class SiteDetailKMZExport {
               break;
           }
           kml.write('''
-      <Placemark>
-        <name>P_${(i + 1).toString().padLeft(3, '0')}</name>
-        <styleUrl>#$poleStyle</styleUrl>
-        <description><![CDATA[
-          ${pole.type ?? 'N/A'}
-        ]]></description>
-        <Point>
-          <coordinates>${pole.lng},${pole.lat}</coordinates>
-        </Point>
-      </Placemark>
+    <Placemark>
+      <name>P_${(i + 1).toString().padLeft(3, '0')}</name>
+      <styleUrl>#$poleStyle</styleUrl>
+      <description><![CDATA[
+        ${pole.type ?? 'N/A'}
+      ]]></description>
+      <Point>
+        <coordinates>${pole.lng},${pole.lat}</coordinates>
+      </Point>
+    </Placemark>
 ''');
         }
       }
     }
-
-    kml.write('''
-    </Folder>
-''');
 
     // Polyline (Customer -> Poles -> FAT)
     if (_hasPolylinePoints(customerLat, customerLng, fatLat, fatLng, poles)) {
