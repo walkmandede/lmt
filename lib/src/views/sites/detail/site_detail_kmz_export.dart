@@ -1,5 +1,8 @@
+import 'dart:developer';
+
 import 'package:archive/archive.dart';
 import 'package:flutter/material.dart';
+import 'package:lmt/core/constants/app_functions.dart';
 import 'dart:typed_data';
 
 import 'package:lmt/src/models/site_detail_model.dart';
@@ -41,11 +44,27 @@ class SiteDetailKMZExport {
         </Icon>
       </IconStyle>
     </Style>
-    <Style id="poleStyle">
+    <Style id="poleStyleMPT">
       <IconStyle>
         <scale>0.8</scale>
         <Icon>
-          <href></href>
+          <href>https://zbqpdaedcztawcmwxqkh.supabase.co/storage/v1/object/public/assets/mpt_pole-removebg-preview.png</href>
+        </Icon>
+      </IconStyle>
+    </Style>
+    <Style id="poleStyleEPC">
+      <IconStyle>
+        <scale>0.8</scale>
+        <Icon>
+          <href>https://zbqpdaedcztawcmwxqkh.supabase.co/storage/v1/object/public/assets/epc_pole-removebg-preview.png</href>
+        </Icon>
+      </IconStyle>
+    </Style>
+    <Style id="poleStyleOther">
+      <IconStyle>
+        <scale>0.8</scale>
+        <Icon>
+          <href>https://zbqpdaedcztawcmwxqkh.supabase.co/storage/v1/object/public/assets/other_pole-removebg-preview.png</href>
         </Icon>
       </IconStyle>
     </Style>
@@ -87,13 +106,30 @@ class SiteDetailKMZExport {
 
     // Pole markers (green)
     if (poles != null && poles.isNotEmpty) {
-      for (int i = 0; i < poles.length; i++) {
+      for (int i = 0; i < poles.length - 1; i++) {
         final pole = poles[i];
         if (pole.lat != null && pole.lng != null) {
+          var poleStyle = 'poleStyleMPT';
+          superPrint(pole.type);
+          log(pole.type ?? "-");
+          switch (pole.type?.toLowerCase()) {
+            case 'mpt':
+              poleStyle = 'poleStyleMPT';
+              break;
+            case 'epc':
+              poleStyle = 'poleStyleEPC';
+              break;
+            case 'other':
+              poleStyle = 'poleStyleOther';
+              break;
+          }
           kml.write('''
       <Placemark>
-        <name>P_${(i + 1).toString().padLeft(3, '0')}\n${pole.type}</name>
-        <styleUrl>#poleStyle</styleUrl>
+        <name>P_${(i + 1).toString().padLeft(3, '0')}</name>
+        <styleUrl>#$poleStyle</styleUrl>
+        <description><![CDATA[
+          ${pole.type ?? 'N/A'}
+        ]]></description>
         <Point>
           <coordinates>${pole.lng},${pole.lat}</coordinates>
         </Point>
@@ -234,7 +270,7 @@ extension SiteDetailModelKMZX on SiteDetailModel {
   String toKML() {
     final polesList =
         poles?.where((p) => p.lat != null && p.lng != null).map((p) => (id: p.id, lat: p.lat, lng: p.lng, type: p.enumPoleType?.name)).toList() ?? [];
-
+    log(poles?.toString() ?? '-');
     return SiteDetailKMZExport.generateKML(
       circuitId: circuitId,
       customerName: customerName,
