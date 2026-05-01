@@ -53,3 +53,4 @@ env/
 /env/
 
 .dart_tool
+.DS_Store
