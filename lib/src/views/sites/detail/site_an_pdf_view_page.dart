@@ -58,7 +58,7 @@ class _SiteAnPdfViewPageState extends State<SiteAnPdfViewPage> {
   }
 
   Future<void> _onPdfPressed(BuildContext context, Uint8List pdfBytes) async {
-    final fileName = '${widget.siteDetailModel.circuitId}-CSRA.pdf';
+    final fileName = '${widget.siteDetailModel.circuitId}.CSRA.pdf';
     await Printing.sharePdf(bytes: pdfBytes, filename: fileName);
   }
 
