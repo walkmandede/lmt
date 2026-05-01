@@ -70,8 +70,8 @@ class SiteDetailKMZExport {
     </Style>
     <Style id="polylineStyle">
       <LineStyle>
-        <color>ffff0000</color>
-        <width>3</width>
+        <color>fff29621</color>
+        <width>6</width>
       </LineStyle>
     </Style>
 ''');

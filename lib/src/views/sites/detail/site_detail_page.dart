@@ -10,6 +10,7 @@ import 'package:lmt/src/models/site_detail_model.dart';
 import 'package:lmt/src/views/_widgets/image_viewer_page.dart';
 import 'package:lmt/src/views/_widgets/section_card.dart';
 import 'package:lmt/src/views/_widgets/site_map_widget.dart';
+import 'package:lmt/src/views/sites/detail/site_an_pdf_view_page.dart';
 import 'package:lmt/src/views/sites/detail/site_detail_kmz_export.dart';
 import 'package:lmt/src/views/sites/detail/site_detail_pdf_view_page.dart';
 import 'package:lmt/src/views/sites/detail/site_map_edit_page.dart';
@@ -126,8 +127,28 @@ class _SiteDetailPageState extends State<SiteDetailPage> {
         actions: widget.siteDetailModel != null
             ? []
             : [
-                IconButton(
-                  icon: Icon(Icons.print),
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) {
+                          return SiteAnPdfViewPage(
+                            siteDetailModel: site,
+                          );
+                        },
+                      ),
+                    );
+                  },
+                  child: Text(
+                    'Print AN',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+                TextButton(
+                  child: Text(
+                    'Print PDF',
+                    style: TextStyle(color: Colors.white),
+                  ),
                   onPressed: () async {
                     // final mapCtrl = await _googleMapController.future;
                     // superPrint(mapCtrl.mapId);
