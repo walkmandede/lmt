@@ -92,7 +92,7 @@ class _SiteAnPdfViewPageState extends State<SiteAnPdfViewPage> {
                   constraints: BoxConstraints(maxWidth: min(500, ((MediaQuery.of(context).size.width) * 0.9))),
                   child: PdfPreview(
                     initialPageFormat: PdfPageFormat.a4,
-                    pdfFileName: '${widget.siteDetailModel.circuitId}-CSRA.pdf',
+                    pdfFileName: '${widget.siteDetailModel.circuitId}.CSRA.pdf',
                     onPrinted: (context) => _onPdfPressed(context, snapshot.data!),
                     build: (_) => snapshot.data!,
                   ),
